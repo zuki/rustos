@@ -2,3 +2,5 @@ target/
 build/
 TAGS
 .dep
+
+doc/book/

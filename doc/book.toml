@@ -1,0 +1,9 @@
+[book]
+authors = ["SUZUKI Keiji"]
+multilingual = false
+src = "src"
+title = "ジョージア工科大学CS-3210講義資料の翻訳"
+
+[output.html]
+default-theme = "rust"
+additional-css = ["theme/custom.css"]
