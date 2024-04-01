@@ -19,7 +19,7 @@ const ACK: u8 = 0x06;
 const NAK: u8 = 0x15;
 const CAN: u8 = 0x18;
 
-/// Implementation of the XMODEM protocol.
+/// XMODEMプロトコルの実装.
 pub struct Xmodem<R> {
     packet: u8,
     started: bool,
@@ -28,11 +28,11 @@ pub struct Xmodem<R> {
 }
 
 impl Xmodem<()> {
-    /// Transmits `data` to the receiver `to` using the XMODEM protocol. If the
-    /// length of the total data yielded by `data` is not a multiple of 128
-    /// bytes, the data is padded with zeroes and sent to the receiver.
+    /// XMODEMプロトコルを使用して`data`を受信側`to` に送信する.
+    /// `data`の全長が128バイトの倍数でない場合は0でパディングして
+    /// 受信側に送信する。
     ///
-    /// Returns the number of bytes written to `to`, excluding padding zeroes.
+    /// パディングゼロを除いた`to`に書き込まれたバイト数を返す。
     #[inline]
     pub fn transmit<R, W>(data: R, to: W) -> io::Result<usize>
         where W: io::Read + io::Write, R: io::Read
@@ -40,14 +40,14 @@ impl Xmodem<()> {
         Xmodem::transmit_with_progress(data, to, progress::noop)
     }
 
-    /// Transmits `data` to the receiver `to` using the XMODEM protocol. If the
-    /// length of the total data yielded by `data` is not a multiple of 128
-    /// bytes, the data is padded with zeroes and sent to the receiver.
+    /// XMODEMプロトコルを使用して`data`を受信側`to` に送信する.
+    /// `data`の全長が128バイトの倍数でない場合は0でパディングして
+    /// 受信側に送信する。
     ///
-    /// The function `f` is used as a callback to indicate progress throughout
-    /// the transmission. See the [`Progress`] enum for more information.
+    /// 関数 `f` は、送信の進行状況を示すコールバックとして使用される。
+    /// 詳細は [`Progress`] enumを参照のこと。
     ///
-    /// Returns the number of bytes written to `to`, excluding padding zeroes.
+    /// パディングゼロを除いた`to`に書き込まれたバイト数を返す。
     pub fn transmit_with_progress<R, W>(mut data: R, to: W, f: ProgressFn) -> io::Result<usize>
         where W: io::Read + io::Write, R: io::Read
     {
@@ -55,14 +55,16 @@ impl Xmodem<()> {
         let mut packet = [0u8; 128];
         let mut written = 0;
         'next_packet: loop {
+            // dataから最大128バイト取り出してpacketにいれる。
             let n = data.read_max(&mut packet)?;
+            // パケットが128に満たない場合は0を詰める
             packet[n..].iter_mut().for_each(|b| *b = 0);
-
+            // dataが殻になったら転送終了
             if n == 0 {
                 transmitter.write_packet(&[])?;
                 return Ok(written);
             }
-
+            // パケット転送を最大10回試行
             for _ in 0..10 {
                 match transmitter.write_packet(&packet) {
                     Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
@@ -78,8 +80,8 @@ impl Xmodem<()> {
         }
     }
 
-    /// Receives `data` from `from` using the XMODEM protocol and writes it into
-    /// `into`. Returns the number of bytes read from `from`, a multiple of 128.
+    /// XMODEMプロトコルを使用して `from` から `data` を受け取り、
+    /// `into` に書き込む. `from` から読み込んだバイト数（128の倍数）を返す。
     #[inline]
     pub fn receive<R, W>(from: R, into: W) -> io::Result<usize>
        where R: io::Read + io::Write, W: io::Write
@@ -87,11 +89,10 @@ impl Xmodem<()> {
         Xmodem::receive_with_progress(from, into, progress::noop)
     }
 
-    /// Receives `data` from `from` using the XMODEM protocol and writes it into
-    /// `into`. Returns the number of bytes read from `from`, a multiple of 128.
+    /// XMODEMプロトコルを使用して `from` から `data` を受け取り、
+    /// `into` に書き込む. `from` から読み込んだバイト数（128の倍数）を返す。
     ///
-    /// The function `f` is used as a callback to indicate progress throughout
-    /// the reception. See the [`Progress`] enum for more information.
+    /// 関数 `f` は、受信の進行状況を示すコールバックとして使用される。
     pub fn receive_with_progress<R, W>(from: R, mut into: W, f: ProgressFn) -> io::Result<usize>
        where R: io::Read + io::Write, W: io::Write
     {
@@ -124,30 +125,30 @@ fn get_checksum(buf: &[u8]) -> u8 {
 }
 
 impl<T: io::Read + io::Write> Xmodem<T> {
-    /// Returns a new `Xmodem` instance with the internal reader/writer set to
-    /// `inner`. The returned instance can be used for both receiving
-    /// (downloading) and sending (uploading).
+    /// 内部リーダ/ライタを `inner` に設定した新しい `Xmodem`
+    /// インスタンスを返す. 返されたインスタンスは受信
+    ///  (ダウンロード) にも送信 (アップロード) にも使用できる。
     pub fn new(inner: T) -> Self {
         Xmodem { packet: 1, started: false, inner, progress: progress::noop}
     }
 
-    /// Returns a new `Xmodem` instance with the internal reader/writer set to
-    /// `inner`. The returned instance can be used for both receiving
-    /// (downloading) and sending (uploading). The function `f` is used as a
-    /// callback to indicate progress throughout the transfer. See the
-    /// [`Progress`] enum for more information.
+    /// 内部リーダ/ライタを `inner` に設定した新しい `Xmodem`
+    /// インスタンスを返す. 返されたインスタンスは受信
+    ///  (ダウンロード) にも送信 (アップロード) にも使用できる。
+    /// 関数 `f` は、受信の進行状況を示すコールバックとして使用される。
     pub fn new_with_progress(inner: T, f: ProgressFn) -> Self {
         Xmodem { packet: 1, started: false, inner, progress: f }
     }
 
-    /// Reads a single byte from the inner I/O stream. If `abort_on_can` is
-    /// `true`, an error of `ConnectionAborted` is returned if the read byte is
-    /// `CAN`.
+    /// 内部のI/Oストリームから1バイトを読み込む.
+    /// `abort_on_can`が`true`の場合、読み込んだバイトが
+    /// `CAN`の場合、`ConnectionAborted`のエラーを返す。
     ///
     /// # Errors
     ///
-    /// Returns an error if reading from the inner stream fails or if
-    /// `abort_on_can` is `true` and the read byte is `CAN`.
+    /// 内部ストリームからの読み取りに失敗した場合、または、
+    /// `abort_on_can`が`true`で読み取りバイト数が`CAN`の
+    /// 場合はエラーを返す。
     fn read_byte(&mut self, abort_on_can: bool) -> io::Result<u8> {
         let mut buf = [0u8; 1];
         self.inner.read_exact(&mut buf)?;
@@ -160,114 +161,209 @@ impl<T: io::Read + io::Write> Xmodem<T> {
         Ok(byte)
     }
 
-    /// Writes a single byte to the inner I/O stream.
+    /// 内部I/Oストリームに1バイト書き込む.
     ///
     /// # Errors
     ///
-    /// Returns an error if writing to the inner stream fails.
+    /// 内部ストリームへの書き込みに失敗した場合はエラーを返す。
     fn write_byte(&mut self, byte: u8) -> io::Result<()> {
         self.inner.write_all(&[byte])
     }
 
-    /// Reads a single byte from the inner I/O stream and compares it to `byte`.
-    /// If the bytes match, the byte is returned as an `Ok`. If they differ and
-    /// the read byte is not `CAN`, an error of `InvalidData` with the message
-    /// `expected` is returned. If they differ and the read byte is `CAN`, an
-    /// error of `ConnectionAborted` is returned. In either case, if they bytes
-    /// differ, a `CAN` byte is written out to the inner stream.
+    /// 内部I/Oストリームから1バイトを読み込み、`byte`と比較する。
+    /// バイトが一致した場合、そのバイトを`Ok`として返す。両者が
+    /// 異なり、読み込んだバイトが`CAN`でない場合、`expected`を
+    /// メッセージとする`InvalidData`エラーを返す。両者が異なり、
+    /// 読み込んだバイトが`CAN`である場合は`ConnectionAborted`
+    /// エラーを返す。どちらの場合もバイトが異なっていれば`CAN`
+    /// バイトを内部ストリームに書き出す。
     ///
     /// # Errors
     ///
-    /// Returns an error if reading from the inner stream fails, if the read
-    /// byte was not `byte`, if the read byte was `CAN` and `byte` is not `CAN`,
-    /// or if writing the `CAN` byte failed on byte mismatch.
+    /// 内部ストリームからの読み込みに失敗した場合、読み込んだ
+    /// バイトが`byte`でなかった場合、読み込んだバイトが`CAN`で
+    /// `byte`が`CAN`でなかった場合、バイトの不一致による`CAN`
+    /// バイトの書き込みに失敗した場合はエラーを返す。
     fn expect_byte_or_cancel(&mut self, byte: u8, expected: &'static str) -> io::Result<u8> {
-        unimplemented!()
+        let res = self.expect_byte(byte, expected);
+        if res.is_err() {
+            self.inner.write_all(&[CAN])?;
+        }
+        res
     }
 
-    /// Reads a single byte from the inner I/O stream and compares it to `byte`.
-    /// If they differ, an error of `InvalidData` with the message `expected` is
-    /// returned. Otherwise the byte is returned. If `byte` is not `CAN` and the
-    /// read byte is `CAN`, a `ConnectionAborted` error is returned.
+    /// 内部I/Oストリームから1バイトを読み込み、`byte`と比較する。
+    /// 両者が異なる場合、`expected`をメッセージとする`InvalidData`
+    /// エラーを返す。それ以外は読み込んだバイトを返す。`byte`が`CAN`で
+    /// なく読み込んだバイトが`CAN`の場合は`ConnectionAborted`
+    /// エラーを返す。
     ///
     /// # Errors
     ///
-    /// Returns an error if reading from the inner stream fails, or if the read
-    /// byte was not `byte`. If the read byte differed and was `CAN`, an error
-    /// of `ConnectionAborted` is returned. Otherwise, the error kind is
-    /// `InvalidData`.
+    /// 内部ストリームからの読み込みに失敗した場合、読み込んだ
+    /// バイトが`byte`でなかった場合、読み込んだバイトが`byte`と
+    /// ことなり`CAN`であった場合、`ConnectionAborted`エラーを返す。
+    /// それ以外は`InvalidData`エラーとする。
     fn expect_byte(&mut self, byte: u8, expected: &'static str) -> io::Result<u8> {
-        unimplemented!()
+        let read = self.read_byte(false)?;
+        if read == byte {
+            Ok(read)
+        } else if read == CAN {
+            ioerr!(ConnectionAborted, "received CAN")
+        } else {
+            ioerr!(InvalidData, expected)
+        }
     }
 
-    /// Reads (downloads) a single packet from the inner stream using the XMODEM
-    /// protocol. On success, returns the number of bytes read (always 128).
+    /// XMODEMプロトコルを使用して内部ストリームからパケットを1つ
+    /// 読み込む (ダウンロードする)。成功した場合は読み込んだ
+    /// バイト数(常に128)を返す。
     ///
-    /// The progress callback is called with `Progress::Started` when reception
-    /// for the first packet has started and subsequently with
-    /// `Progress::Packet` when a packet is received successfully.
+    /// 最初のパケットの受信を開始したら進捗コールバックを
+    /// `Progress::Started`で呼び出す。後続のパケットの受信に
+    /// 成功した場合は`Progress::Packet`で呼び出す。
     ///
     /// # Errors
     ///
-    /// Returns an error if reading or writing to the inner stream fails at any
-    /// point. Also returns an error if the XMODEM protocol indicates an error.
-    /// In particular, an `InvalidData` error is returned when:
+    /// 内部ストリームの読み書きに失敗した場合はエラーを返す。
+    /// また、XMODEMプロトコルがエラーを示している場合もエラーを
+    /// 返す。特に、以下の場合は`InvalidData`エラーを返す。
     ///
-    ///   * The sender's first byte for a packet isn't `EOT` or `SOH`.
-    ///   * The sender doesn't send a second `EOT` after the first.
-    ///   * The received packet numbers don't match the expected values.
+    ///   * 送信者のパケットの最初のバイトが`EOT`でも`SOH`でもない。
+    ///   * 送信者が最初の`EOT`に続いて2回目の`EOT`を送信しない。
+    ///   * 受信したパケット番号が期待する値と一致しない。
     ///
-    /// An error of kind `Interrupted` is returned if a packet checksum fails.
+    /// パケットのチェックサムが異なる場合は`Interrupted`エラーを返す。
     ///
-    /// An error of kind `ConnectionAborted` is returned if a `CAN` byte is
-    /// received when not expected.
+    /// 予想外の`CAN`バイトを受信した場合は`ConnectionAborted`エラーを返す。
     ///
-    /// An error of kind `UnexpectedEof` is returned if `buf.len() < 128`.
+    /// `buf.len() < 128` の場合は`UnexpectedEof`エラーを返す。
     pub fn read_packet(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        unimplemented!()
+        if buf.len() < 128 {
+            return ioerr!(UnexpectedEof, "buf.len() < 128");
+        }
+
+        if !self.started {
+            self.write_byte(NAK)?;
+            self.started = true;
+        }
+
+        match self.read_byte(true)? {
+            SOH => {
+                (self.progress)(Progress::Started);
+
+                self.expect_byte_or_cancel(self.packet, "receive correct pno")?;
+                self.expect_byte_or_cancel(255 - self.packet, "receive 255 - pno")?;
+
+                for i in 0..128 {
+                    buf[i] = self.read_byte(false)?;
+                }
+
+                let cs = self.read_byte(false)?;
+                if cs != get_checksum(buf) {
+                    self.write_byte(NAK)?;
+                    return ioerr!(Interrupted, "not match checksum");
+                }
+
+                self.write_byte(ACK)?;
+                (self.progress)(Progress::Packet(self.packet));
+                self.packet += 1;
+                Ok(128)
+            }
+            EOT => {
+                self.write_byte(NAK)?;
+                self.expect_byte_or_cancel(EOT, "expect EOT")?;
+                self.write_byte(ACK)?;
+                Ok(0)
+            }
+            _ => {
+                self.write_byte(CAN)?;
+                return ioerr!(InvalidData, "not SOH nor EOT");
+            }
+        }
     }
 
-    /// Sends (uploads) a single packet to the inner stream using the XMODEM
-    /// protocol. If `buf` is empty, end of transmissions is sent. Users of this
-    /// interface should ensure that `write_packet(&[])` is called when data
-    /// transmission is complete. On success, returns the number of bytes
-    /// written.
+    /// XMODEM プロトコルを使用して内部ストリームにパケットを1つ
+    /// 送信 (アップロード) する。`buf`が空の場合は送信終了を送信する。
+    /// このインタフェースのユーザはデータ送信が完了した際に
+    /// `write_packet(&[])`を呼ばなければならない。成功した場合は
+    /// 書き込んだバイト数を返す。
     ///
-    /// The progress callback is called with `Progress::Waiting` before waiting
-    /// for the receiver's `NAK`, `Progress::Started` when transmission of the
-    /// first packet has started and subsequently with `Progress::Packet` when a
-    /// packet is sent successfully.
+    /// 受信者の`NAK`を待つ前に進捗コールバックを`Progress::Waiting`で
+    /// 呼び出す。最初のパケットの送信を開始したら`Progress::Started`で、
+    /// 後続のパケットの送信に成功した場合は`Progress::Packet`で呼び出す。
     ///
     /// # Errors
     ///
-    /// Returns an error if reading or writing to the inner stream fails at any
-    /// point. Also returns an error if the XMODEM protocol indicates an error.
-    /// In particular, an `InvalidData` error is returned when:
+    /// 内部ストリームの読み書きに失敗した場合はエラーを返す。また、XMODEM
+    /// プロトコルがエラーを示している場合もエラーを返す。特に、以下の場合は
+    /// `InvalidData`エラーを返す。
     ///
-    ///   * The receiver's first byte isn't a `NAK`.
-    ///   * The receiver doesn't respond with a `NAK` to the first `EOT`.
-    ///   * The receiver doesn't respond with an `ACK` to the second `EOT`.
-    ///   * The receiver responds to a complete packet with something besides
-    ///     `ACK` or `NAK`.
+    ///   * 受信者の最初のバイトが`NAK`でない。
+    ///   * 受信者が最初の`EOT`に`NAK`で応答しない。
+    ///   * 受信者が2回目の`EOT`に`ACK`で応答しない。
+    ///   * 受信者が完全なパケットに対して`ACK`でも`NAK`でもない
+    ///     バイトで応答した。
     ///
-    /// An error of kind `UnexpectedEof` is returned if `buf.len() < 128 &&
-    /// buf.len() != 0`.
+    /// `buf.len() < 128 && buf.len() != 0` の場合は
+    /// `UnexpectedEof`エラーを返す。
     ///
-    /// An error of kind `ConnectionAborted` is returned if a `CAN` byte is
-    /// received when not expected.
+    /// 予期しない`CAN`バイトを受信した場合は`
+    /// `ConnectionAborted`エラーを返す。
     ///
-    /// An error of kind `Interrupted` is returned if a packet checksum fails.
+    /// パケットのチェックサムが間違っている場合は
+    /// `Interrupted`エラーを返す。
     pub fn write_packet(&mut self, buf: &[u8]) -> io::Result<usize> {
-        unimplemented!()
+        if buf.len() < 128 && buf.len() != 0 {
+            return ioerr!(UnexpectedEof, "wrong buffer length");
+        }
+
+        (self.progress)(Progress::Waiting);
+
+        if !self.started {
+            self.expect_byte(NAK, "expect nak")?;
+            self.started = true;
+        }
+
+        if buf.len() == 0 {
+            self.write_byte(EOT)?;
+            self.expect_byte(NAK, "expect nak")?;
+            self.write_byte(EOT)?;
+            self.expect_byte(ACK, "expect ack")?;
+            self.started = false;
+            return Ok(0);
+        }
+
+        (self.progress)(Progress::Started);
+
+        self.write_byte(SOH)?;
+        self.write_byte(self.packet)?;
+        self.write_byte(255 - self.packet)?;
+
+        for i in 0..128 {
+            self.write_byte(buf[i])?;
+        }
+        self.write_byte(get_checksum(buf))?;
+
+        match self.read_byte(true)? {
+            ACK => {}
+            NAK => return ioerr!(Interrupted, "replied NAK to checksum"),
+            _ => return ioerr!(InvalidData, "invaled reply")
+        }
+
+        (self.progress)(Progress::Packet(self.packet));
+        self.packet += 1;
+        Ok(128)
     }
 
-    /// Flush this output stream, ensuring that all intermediately buffered
-    /// contents reach their destination.
+
+    /// この出力ストリームをフラッシュし、中間バッファリングされた
+    /// コンテンツがすべて宛先に到達するようにする。
     ///
     /// # Errors
     ///
-    /// It is considered an error if not all bytes could be written due to I/O
-    /// errors or EOF being reached.
+    /// I/Oエラーですべてのバイトを送信できなかった場合、または
+    /// EOFが届いた場合はエラーとみなす。
     pub fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
     }
