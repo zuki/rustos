@@ -118,7 +118,7 @@ Cargoの使い方やCargoの動作についての詳細は[Cargo Book](https://d
 - `src/lib.rs` - ここにコードを記述します
 - `src/tests.rs` - `cargo test`が呼ばれたときに実行されるテストです
 
-### `StackVec`インタフェース
+#### `StackVec`インタフェース
 
 `StackVec<T>`は`StackVec::new()`に任意の型`T`の値の可変スライスを
 渡して呼び出すことで生成されます。`StackVec<T>`型は[Vec](https://doc.rust-lang.org/nightly/std/vec/struct.Vec.html)が
@@ -150,7 +150,7 @@ pub struct StackVec<'a, T: 'a> {
 }
 ```
 
-### `StackVec`の理解
+#### `StackVec`の理解
 
 以下の質問は`StackVec`インタフェースについての理解度をテストする
 ものです。
@@ -184,7 +184,7 @@ pub struct StackVec<'a, T: 'a> {
 > いるときにしか実装されていません。なぜですか。この束縛を取り除くと
 > 何が問題になりますか。
 
-### `StackVec`の実装
+#### `StackVec`の実装
 
 `stack-vec/src/lib.rs`にある`StackVec`の`unimplemented()` メソッドをすべて
 実装してください。各メソッドはソースコードに記述されています。また、実装が
@@ -246,7 +246,7 @@ fn f() {
 ことを約束します。したがって、実行時に確実に読み書きが行われるようにしたい
 のであればvolatileメモリアクセスを行う必要があります。
 
-### Rust流`valatile`
+#### Rust流`valatile`
 
 Rustでは生ポインタへのvolatile読み書きを行うのに`read_volatile`メソッドと
 `write_volatile`メソッドを使用ます。
@@ -267,7 +267,7 @@ volaite読み書きを行うたびに`read_volatile`や`write_volatile`を呼び
 さらに良いのは、（C言語とは異なり）ポインタを読み取り専用、書き込み専用、
 読み書き可能と宣言し、適切なメモリアクセスだけが行えるようにすることです。
 
-### `Volatile`, `ReadVolatile`, `WriteVolatile`, `UniqueVolatile`の導入
+#### `Volatile`, `ReadVolatile`, `WriteVolatile`, `UniqueVolatile`の導入
 
 スケルトンサブディレクトリ`volatile/`にある`volatile`クレートはこれだけを
 行うことができる4つの型を実装しています。`volatile/`ディレクトリで
@@ -327,7 +327,7 @@ Piへのデータ*送信*には既存のXMODEMプロトコルの実装を使つ�
 が、それでも独自のレシーバを書く必要はあります。そこでついでにXMODEMの
 送信も実装することにします。
 
-### プロトコル
+#### プロトコル
 
 XMODEMプロトコルの詳細は[Understanding The X-Modem File Transfer Protocol](https://cs140e.sergio.bz/assignments/1-shell/data/XMODEM.txt)
 テキストファイルに記載されています。後世のためにここでもう一度言って
@@ -410,7 +410,7 @@ const CAN: u8 = 0x18;
 2. 2回目の`EOT`バイトを待つ。異なるバイトを受信した場合、受信側はエラーとする
 3. `ACK`バイトを送信する
 
-### XMODEMの実装
+#### XMODEMの実装
 
 XMODEMプロトコルの未完成の実装を`xmodem`スケルトンサブディレクトリに
 用意しました。あなたの課題は`src/lib.rs`にある`expect_byte`,
@@ -449,3 +449,122 @@ XMODEMを使用した完全なデータストリームを送信または受信�
 > `ioerr!`マクロを使うと新たら`io::Error`を簡単に作成して返すことが
 > できます。`shim/src/macros.rs`を参照するとさらに便利なマクロを
 > 見つけることができます。
+
+### サブフェーズ D: `ttywrite`
+
+このサブフェーズではRaspberry Piに生データまたはXMODEMプロトコルで
+データを送信できるコマンドラインユーティリティ`ttywrite`を作成します。
+このユーティリティの実装にはサブフェーズ Cで作成した`xmodem`ライブラリを
+使用します。コードは`ttywrite/src/main.rs`に書きます。`ttywrite`の実装の
+テストには提供した`test.sh`スクリプトを使ってください。
+
+**注記: シリアルデバイスとは何か**
+> シリアルデバイスとは一度に1ビットの通信を受け付けるデバイスのことです。
+> これは*シリアル通信*と呼ばれています。対して*パラレル通信*は一度に複数の
+> ビットが並行して転送されます。ここではシリアル通信デバイスであるUART
+> デバイスを介してRaspberry Piと通信します。
+
+**注記: TTYとは何か**
+> TTYは「テレタイプライター」のことです。コンピュータ端末を表す言葉として
+> コンピューティング分野で採用された歴史的な言葉です。その後、この用語は
+> より一般的になり、シリアル通信を目的としたあらゆる機を指すように
+> なりました。このため、コンピュータはRaspberry Piにマッピングされた
+> デバイスをTTYと呼んでいます。
+
+#### コマンドラインインタフェース
+
+提供している`ttywrite`のスケルトンコードではすでにコマンドライン引数の
+解析と検証を行っています。これを行うために[crates.io](https://crates.io/)の
+[structopt crate](https://github.com/TeXitoi/structopt)を使用しています。
+structoptは[clap](https://clap.rs/)を使用しています。これらは`Cargo.toml`
+ファイルの依存関係にリストされていることに気づくでしょう。structoptはコード
+生成により動作します。構造体とそのフィールドにコマンドライン引数の宣言を
+アノテーションするだけで、structoptがコマンドラインフラグを実際にパースする
+コードを生成します。
+
+structoptが生成するインタフェースは`--help`を付けてアプリケーションを
+呼び出すと見ることができます。`cargo run`を使用する際には次のようにすると
+任意のフラグを渡せることを思い出してください: `cargo run -- --help`。
+ではインタフェースを見てください。そして、`main.rs`にある`Opt`構造体を
+見て、インタフェースとその定義を比べてみてください。
+
+**質問 (invalid): 無効なフラグが入力された場合はどうなるか**
+> フラグとして無効な値をいくつか渡してみてください。たとえば、`-f`に`idk`を
+> 設定することはできないはずです。どのようにして`structopt`は無効な値を
+> 拒否することを知るのでしょうか。
+
+たくさんのオプションがあることに気づくでしょう。これらはすべてシリアル
+デバイスで利用できる設定に対応しています。今のところ、これらの設定が何を
+するのかを正確に知ることは重要ではありません。
+
+#### シリアルデバイスとの会話
+
+`main`では[serial::open](https://docs.rs/serial/0.4.0/serial/fn.open.html)を
+呼び出しています。これは同じく`crates.io`にある[serial](https://docs.rs/serial/0.4.0/serial/)クレート
+の`open`関数を呼び出しています。この`open`関数は[TTYPort](https://docs.rs/serial-unix/0.4.0/serial_unix/struct.TTYPort.html)を
+返します。これを使うと（その`io::Read`トレイトと`io::Write`トレイトの実装に
+より）シリアルデバイスとの読み書きができ、（`SerialDevice`トレイとの実装に
+より）シリアルデバイスの設定の読み書きができます。
+
+#### コードを書く
+
+`ttywrite`ユーティリティを実装します。実装は`main`にある`opt`変数に格納
+されたコマンドライン経由で渡された適切な設定をすべて設定する必要があります。
+入力ファイルが渡されなかった場合は標準入力から、渡された場合はその入力
+ファイルから読み込みます。シリアルデバイスに渡すために入力データを書き込み
+ます。`-r`フラグがセットされていた場合はデータをそのまま送信します。そうで
+ない場合は前サブフェーズで作成した`xmodem`実装を使用して`XMODEM`プロトコルを
+使ってデータを送信する必要があります。送信に成功した場合は送信したバイト数を
+表示する必要があります。
+
+XMODEMプロトコルを使用して送信するには`xmodem`ライブラリの`Xmodem::transmit`
+メソッドまたは`Xmodem::transmit_with_progress`メソッドを使用します。
+ユーティリティが送信の進行状況を示せるように`transmit_with_progress`を
+使用することを勧めます。最も単純な形は次のようになります。
+
+```rust
+fn progress_fn(progress: Progress) {
+    println!("Progress: {:?}", progress);
+}
+
+Xmodem::transmit_with_progress(data, to, progress_fn)
+```
+
+実装のベースラインの正しさは`ttywrite`ディレクトリにある`test.sh`スクリプトを
+使ってテストすることができます。実装が少なくともある程度は正しい場合、
+スクリプトを実行すると次のように表示されます。
+
+```bash
+Opening PTYs...
+Running test 1/10.
+wrote 333 bytes to input
+...
+Running test 10/10.
+wrote 232 bytes to input
+SUCCESS
+```
+
+**ヒント**
+> `stdin`のハンドルは[io::stdin()](https://doc.rust-lang.org/nightly/std/io/fn.stdin.html)で取り出すことができます。
+
+**ヒント**
+> [io::copy()](https://doc.rust-lang.org/nightly/std/io/fn.copy.html)関数が役に立つでしょう。
+
+
+**ヒント**
+> `main()`関数のリファレンス実装はそれぞれおよそ35行のコードです。
+
+**ヒント**
+> コードを書いている間は[TTYPort](https://docs.rs/serial-unix/0.4.0/serial_unix/struct.TTYPort.html)のドキュメントを開いておくと良いでしょう。
+
+**質問 (bad-tests): `test.sh`スクリプトが常に`-r`を設定するのはなぜか**
+提供した`test.sh`スクリプトは常に`-r`フラグを使用しています。それが要求
+された時にユーティリティがXMODEMプロトコルを使用することをテストして
+いません。それはなぜですか。XMODEMプロトコルはrawでデータを送信することを
+想定していないためその機能をテストするのが難しいのでしょうか。
+
+#### `ttywrite`ユーティリティのインストール
+
+`ttywrite`ユーティリティを書き終えたら、`cargo install --path .`コマンドで
+ツールをインストールしてください。このコマンドは後でブートローダと通信する
+ために使用します。

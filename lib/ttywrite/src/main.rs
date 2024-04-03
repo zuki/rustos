@@ -2,16 +2,18 @@ mod parsers;
 
 use serial;
 use structopt;
-use structopt_derive::StructOpt;
-use xmodem::Xmodem;
+//use structopt_derive::StructOpt;
+use xmodem::{Xmodem, Progress};
 
+use std::io;
 use std::path::PathBuf;
 use std::time::Duration;
 
 use structopt::StructOpt;
-use serial::core::{CharSize, BaudRate, StopBits, FlowControl, SerialDevice, SerialPortSettings};
+use serial::core::{CharSize, BaudRate, StopBits, FlowControl, SerialDevice};
 
 use parsers::{parse_width, parse_stop_bits, parse_flow_control, parse_baud_rate};
+use serial::{SerialPort, PortSettings, SystemPort};
 
 #[derive(StructOpt, Debug)]
 #[structopt(about = "Write to TTY using the XMODEM protocol by default.")]
@@ -46,12 +48,92 @@ struct Opt {
     raw: bool,
 }
 
+fn progress_fn(progress: Progress) {
+    println!("Progress: {:?}", progress);
+}
+
+fn send_full(input: &mut dyn io::Read, port: &mut SystemPort, raw: bool) -> io::
+Result<usize> {
+    if raw {
+        return match io::copy(input, port) {
+            Ok(t) => Ok(t as usize),
+            Err(e) => Err(e),
+        };
+    }
+
+    Xmodem::transmit_with_progress(input, port, progress_fn)
+}
+
+
 fn main() {
     use std::fs::File;
-    use std::io::{self, BufReader};
 
     let opt = Opt::from_args();
+    // port: TTYPort
     let mut port = serial::open(&opt.tty_path).expect("path points to invalid TTY");
 
     // FIXME: Implement the `ttywrite` utility.
+    // configure()はSerialPortトレイとの関数
+    port.configure(&PortSettings {
+        baud_rate: opt.baud_rate,
+        char_size: opt.char_width,
+        parity: serial::ParityNone,
+        stop_bits: opt.stop_bits,
+        flow_control: opt.flow_control,
+    }).expect("failed to configure");
+
+    SerialDevice::set_timeout(&mut port, Duration::from_secs(opt.timeout)).expect("failed to set timeout");
+
+    for _ in 0..1 {
+        //println!("Sending...");
+
+        loop {
+            let mut source: Box<dyn io::Read>;
+            if let Some(path) = &opt.input {
+                source = Box::new(File::open(path).expect("failted to open file"));
+            } else {
+                source = Box::new(io::stdin());
+            }
+
+            match send_full(source.as_mut(), &mut port, opt.raw) {
+                Ok(n) => {
+                    println!("wrote {} bytes", n);
+                    return;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::InvalidData => continue,
+                Err(e) => {
+                    println!("\nFailed to send: {}", e);
+                    break;
+                }
+            }
+        }
+    }
+/*
+    let mut setting = port.read_settings().expect("could not tty settings");
+    setting.set_baud_rate(opt.baud_rate);
+    setting.set_char_size(opt.char_width);
+    setting.set_stop_bits(opt.stop_bits);
+    setting.set_flow_control(opt.flow_control);
+
+    loop {
+        if opt.raw {
+            let mut input = String::new();
+            match io::stdin().read_line(&mut input) {
+                Ok(_) => {
+                    match port.write(&input.as_bytes()) {
+                        Ok(n) => println!("send {} bytes", n),
+                        Err(error) => println!("write error: {:?}", error),
+                    }
+                }
+                Err(error) => println!("read error: {:?}", error),
+            }
+        } else {
+            let buf_reader = BufReader::new(File::open(&opt.input.unwrap().as_path()).unwrap());
+            match Xmodem::transmit_with_progress(buf_reader, port, progress_fn) {
+                Ok(n) => println!("Send {} byte by xmodem", n),
+                Err(error) => println!("send erro by xmodemr: {:?}", error),
+            }
+        }
+    }
+*/
 }
