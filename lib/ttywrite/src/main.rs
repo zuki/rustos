@@ -73,7 +73,7 @@ fn main() {
     let mut port = serial::open(&opt.tty_path).expect("path points to invalid TTY");
 
     // FIXME: Implement the `ttywrite` utility.
-    // configure()はSerialPortトレイとの関数
+    // configure()はSerialPortトレイトの関数
     port.configure(&PortSettings {
         baud_rate: opt.baud_rate,
         char_size: opt.char_width,
@@ -84,56 +84,24 @@ fn main() {
 
     SerialDevice::set_timeout(&mut port, Duration::from_secs(opt.timeout)).expect("failed to set timeout");
 
-    for _ in 0..1 {
-        //println!("Sending...");
-
-        loop {
-            let mut source: Box<dyn io::Read>;
-            if let Some(path) = &opt.input {
-                source = Box::new(File::open(path).expect("failted to open file"));
-            } else {
-                source = Box::new(io::stdin());
-            }
-
-            match send_full(source.as_mut(), &mut port, opt.raw) {
-                Ok(n) => {
-                    println!("wrote {} bytes", n);
-                    return;
-                }
-                Err(ref e) if e.kind() == io::ErrorKind::InvalidData => continue,
-                Err(e) => {
-                    println!("\nFailed to send: {}", e);
-                    break;
-                }
-            }
-        }
-    }
-/*
-    let mut setting = port.read_settings().expect("could not tty settings");
-    setting.set_baud_rate(opt.baud_rate);
-    setting.set_char_size(opt.char_width);
-    setting.set_stop_bits(opt.stop_bits);
-    setting.set_flow_control(opt.flow_control);
-
     loop {
-        if opt.raw {
-            let mut input = String::new();
-            match io::stdin().read_line(&mut input) {
-                Ok(_) => {
-                    match port.write(&input.as_bytes()) {
-                        Ok(n) => println!("send {} bytes", n),
-                        Err(error) => println!("write error: {:?}", error),
-                    }
-                }
-                Err(error) => println!("read error: {:?}", error),
-            }
+        let mut source: Box<dyn io::Read>;
+        if let Some(path) = &opt.input {
+            source = Box::new(File::open(path).expect("failted to open file"));
         } else {
-            let buf_reader = BufReader::new(File::open(&opt.input.unwrap().as_path()).unwrap());
-            match Xmodem::transmit_with_progress(buf_reader, port, progress_fn) {
-                Ok(n) => println!("Send {} byte by xmodem", n),
-                Err(error) => println!("send erro by xmodemr: {:?}", error),
+            source = Box::new(io::stdin());
+        }
+
+        match send_full(source.as_mut(), &mut port, opt.raw) {
+            Ok(n) => {
+                println!("wrote {} bytes", n);
+                return;
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::InvalidData => continue,
+            Err(e) => {
+                println!("\nFailed to send: {}", e);
+                break;
             }
         }
     }
-*/
 }
