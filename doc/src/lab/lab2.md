@@ -558,13 +558,178 @@ SUCCESS
 > コードを書いている間は[TTYPort](https://docs.rs/serial-unix/0.4.0/serial_unix/struct.TTYPort.html)のドキュメントを開いておくと良いでしょう。
 
 **質問 (bad-tests): `test.sh`スクリプトが常に`-r`を設定するのはなぜか**
-提供した`test.sh`スクリプトは常に`-r`フラグを使用しています。それが要求
-された時にユーティリティがXMODEMプロトコルを使用することをテストして
-いません。それはなぜですか。XMODEMプロトコルはrawでデータを送信することを
-想定していないためその機能をテストするのが難しいのでしょうか。
+> 提供した`test.sh`スクリプトは常に`-r`フラグを使用しています。それが要求
+> された時にユーティリティがXMODEMプロトコルを使用することをテストして
+> いません。それはなぜですか。XMODEMプロトコルはrawでデータを送信する
+> ことを想定していないためその機能をテストするのが難しいのでしょうか。
 
 #### `ttywrite`ユーティリティのインストール
 
 `ttywrite`ユーティリティを書き終えたら、`cargo install --path .`コマンドで
 ツールをインストールしてください。このコマンドは後でブートローダと通信する
 ために使用します。
+
+## フェーズ 2: *貝殻では*ない*
+
+このフェーズでは内蔵タイマー、GPIO、UARTデバイス用のドライバを実装します。
+そして、これらのドライバを使って簡単なシェルを実装します。次のフェーズ
+では、同じドライバを使ってブートローダを実装します。
+
+**注記: ドライバとは何か**
+> *ドライバ*、または、*デバイスドライバ*という用語はハードウェアデバイスと
+> 直接相互作用し、制御するソフトウェアを表します。ドライバは制御する
+> ハードウェアに対する高レベルなインタフェースを公開します。OSはデバイス
+> ドライバと相互作用してさらに高レベルなインタフェースを公開することが
+> できます。たとえば、LinuxカーネルはオーディオAPIであるALSA (Advanced
+> Linux Sound Architecture) を公開しており、ALSAはデバイスドライバと相互
+> 作用し、デバイスドライバはサウンドカードと直接相互作用します。
+
+### サブフェーズ A: 始める前に
+
+#### プロジェクト構成
+
+この課題の最初に見たリポジトリの構成を思い出してみましょう。
+
+```bash
+.
+├── ...
+├── boot : bootloader *
+├── kern : the main os kernel *
+└── lib  : required libraries
+     ├── pi *
+     ├── shim
+     ├── stack-vec *
+     ├── ttywrite *
+     ├── volatile *
+     └── xmodem *
+```
+
+ブートとカーネルが使用するライブラリはすべて`lib`ディレクトリにあります。
+
+`shim`ライブラリは`std`と`no_std`のいずれかのライブラリに選択的に依存
+します。`#[cfg(feature = "no_std")]`を指定すると`shim`は`core_io`と
+`ffi`, `path`, `syncなどの必要最小限のライブラリを持つカスタム`no_std`
+モジュールを使用します。それ以外の場合は（ほとんどはテストコードです）
+`shim`は`std`ライブラリを使用します。
+
+`pi`サブディレクトリにはすべてのドライバコードが含まれています。`pi`
+ライブラリは`volatile`ライブラリを使用します。また、`shim`ライブラリにも
+依存しています。
+
+`boot`と`kernel`は`pi`ライブラリを使用してハードウェアと通信します。
+`shim`にも依存しています。さらに、`boot`は`xmodem`ライブラリに依存し、
+`kernel`は`stack-vec`ライブラリに依存します。`volatile`ライブラリには
+依存関係がありません。下図はこれらの関係を示しています。
+
+![ライブラリ関係図](lib_relationship.png)
+
+#### カーネル
+
+`kern`ディレクトリにはオペレーティングシステムの中核となる
+オペレーティングシステムカーネルのコードが含まれています。この
+ディレクトリで`make`を実行するとカーネルがビルドされます。ビルド出力は
+`build/`ディレクトリに格納されます。カーネルを実行するには
+`build/kernel.bin`ファイルを`kernel8.img`とリネームしてMicroSDカードの
+ルートにコピーします。`make install`コマンドでカーネルイメージをSD
+カードにコピーするスクリプトを使用することもできます。`Makefile`の詳細に
+ついては[Toolsページ](https://tc.gts3.org/cs3210/2020/spring/lab/tools.html)を
+参照してください。
+
+現時点ではカーネルはまったく何もしません。このフェーズが終わるころには
+カーネルはシェルを起動して会話することができるようになります。
+
+上で見たように`kernel`クレートは`pi`ライブラリに依存しています。そのため、
+`pi`ライブラリのすべての型とアイテムをカーネルで使うことができます。
+
+
+#### ドキュメント
+
+デバイスドライバを書いている間は[BCM2837 ARM Peripherals Manual](file:///Users/dspace/xv6_memos/book/arm/bcm2837/index.html)を
+開いておくとよいでしょう。
+
+### サブフェーズ B: システムタイマー
+
+このサブフェーズではARMシステムタイマーのデバイスドライバを作成します。
+主に`lib/pi/src/timer.rs`と`kern/src/main.rs`で作業します。ARMシステム
+タイマーについては[BCM2837 ARM Peripherals Manualの172ページ（セクション12）](file:///Users/dspace/xv6_memos/book/arm/bcm2837/12_system_timer.html)に記載されています。
+
+`lib/pi/src/timer.rs`にある既存のコードを見ることから始めてください。
+特に、以下のセクションの関係に注意してください。
+
+```rust
+onst TIMER_REG_BASE: usize = IO_BASE + 0x3000;
+
+  #[repr(C)]
+  struct Registers {
+      CS: Volatile<u32>,
+      CLO: ReadVolatile<u32>,
+      CHI: ReadVolatile<u32>,
+      COMPARE: [Volatile<u32>; 4]
+  }
+
+  pub struct Timer {
+      registers: &'static mut Registers
+  }
+
+  impl Timer {
+      pub fn new() -> Timer {
+          Timer {
+              registers: unsafe { &mut *(TIMER_REG_BASE as *mut Registers) },
+          }
+      }
+  }
+```
+
+このプログラムの`unsafe`で囲まれた1行は非常に重要です。そこでは
+`TIMER_REG_BASE`のアドレスを`*mut Registers`にキャストし、それを
+`&'static mut Registers`にキャストしています。これはアドレス
+`TIMER_REG_BASE`にある`Registers`構造体への静的参照があることを
+Rustに伝えています。
+
+`TIMER_REG_BASE`アドレスには何があるのでしょうか。[BCM2837 ARM Peripherals Manualの172ページ](file:///Users/dspace/xv6_memos/book/arm/bcm2837/12_system_timer.html)には`0x3000`がARMシステムタイマーの
+ペリフェラルオフセットであることが記載されています。したがって、
+`TIMER_REG_BASE`はARMシステムタイマーレジスタの開始アドレスです。この
+`unsafe`で囲んだ1行の後では`registers`フィールドを使ってタイマーの
+レジスタに安全にアクセスできます。`self.registers.CLO.read()`を使って
+`CLO`レジスタを読むことができ、`self.registers.CS.write()`を使って
+`CS`レジスタに書き込むことができ、そして、これらを組み合わせることで
+経過マイクロ秒数を表すことができます。
+
+**質問 (restricted-reads): なぜCLOやCHIには書き込めないのか**
+> BCM2837のドキュメントによると`CLO`と`CHI`レジスタはリードオンリーです。
+> 私たちのコードはこのプロパティを強制します。どのようにしてですか。
+> CLOやCHIへの書き込みを妨げるものは何ですか。
+
+    読み書きができるVolatile<T>方でなく、VaolatileRead<T>方を
+    使用している
+
+**注記: `unsafe`とは一体何か**
+> 手短に言うと`unsafe`はRustコンパイラに自分がメモリ安全性の制御を行う
+> ことを示すマーカーです。コンパイラはメモリ問題から守ってくれなく
+> なります。その結果、`unsafe`セクションではRustはCでできることなら
+> 何でもできるようになります。特に、型間の自由なキャスト、生ポインタの
+> 逆参照、ライフタイムの生成ができます。
+>
+> ただし、`unsafe`はまったく安全でないことに注意してください。`unsafe`
+> セクションで行うすべてのことが実際に*安全*であることを保証しなければ
+> なりません。これは想像以上に難しいです。特に、Rustの`safe`の考え方は
+> 他の言語よりもずっと厳格だからです。そのため、`unsafe`はなるべく使わない
+> ようにするべきです。残念ながらOSではハードウェアと直接対話できるように
+> するために`unsafe`を*使わざるを得ません*が、通常、使用はドライバごとに
+> 1行に制限します
+>
+> `unsafe`について詳しく知りたい場合は["Nomicon"の第1章](https://doc.> rust-lang.org/nightly/nomicon/meet-safe-and-unsafe.html)を
+> 読んでください。
+
+#### ドライバの実装
+
+`lib/pi/src/timer.rs`の`Timer::read()`, `current_time()`, `spin_sleep()`
+を実装してください。これらの関数のシグネチャが期待される機能を示して
+います。`Timer::read()`を実装するにはBCMマニュアルのタイマーに関する
+ドキュメントを読む必要があります。特に、タイマーの現在のu64値を取得する
+ためにはどのレジスタを読めばよいかを理解する必要があります。`pi`
+ライブラリは`cargo build`でビルドできます。また、`cargo check`を使用
+するとライブラリを実際にコンパイルせずに型チェックを行うこともできます。
+
+**ヒント**
+> `core::time::Duration`のページが便利です。
