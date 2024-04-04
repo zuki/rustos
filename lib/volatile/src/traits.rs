@@ -1,30 +1,30 @@
-/// Trait implemented by all of the wrapper types in this crate.
+/// このクレートのラッパー型のすべてで実装されるトレイト.
 ///
-/// The inner type of wrapper is specified as an associated constant `Inner`.
-/// This allows for generic implementations over all of the wrapper types.
+/// ラッパーのinner型は関連するconstant `inner`により指定される。
+/// これによりラッパー型の全てにおいてジェネリックな実装が可能になる。
 pub trait Wrapper {
-    /// The type of the wrapped value.
+    /// ラップされる値の型.
     type Inner;
 
-    /// Returns a pointer to the wrapped item.
+    /// ラップされているアイテムへのピンタを返す.
     fn ptr(&self) -> *const Self::Inner;
 }
 
-/// Trait implemented by **readable** volatile wrappers.
+/// **readable** volatile ラッパーにより実装されるトレイト.
 pub trait Readable<T> {
-    /// Returns the inner pointer.
+    /// innerポインタを返す.
     #[inline(always)]
     fn inner(&self) -> *const T;
 
-    /// Reads and returns the value pointed to by `self`. The read is always
-    /// done using volatile semantics.
+    /// `self`が指している値を読んで返す. readは常にvolatileセマンティクスを
+    /// 使って行われる.
     #[inline(always)]
     fn read(&self) -> T {
         unsafe { ::core::ptr::read_volatile(self.inner()) }
     }
 
-    /// Returns `true` if the value pointed to by `self` has the mask `mask`.
-    /// This is equivalent to `(self.read() & mask) == mask`.
+    /// `self`が指している値がマスク値 `mask` を持っている場合、`true` を返す.
+    /// これは `(self.read() & mask) == mask` に相当する.
     #[inline(always)]
     fn has_mask(&self, mask: T) -> bool
         where T: ::core::ops::BitAnd<Output = T>,
@@ -34,37 +34,36 @@ pub trait Readable<T> {
     }
 }
 
-/// Trait implemented by **writeable** volatile wrappers.
+/// **writeable** volatile ラッパーにより実装されるトレイト.
 pub trait Writeable<T> {
-    /// Returns the inner pointer.
+    /// innerポインタを返す.
     #[inline(always)]
     fn inner(&mut self) -> *mut T;
 
-    /// Writes the value `val` to the inner address of `self`. The write is
-    /// always done using volatile semantics.
+    /// `self` のinnerアドレスに値 `val` を書き込む. writeは常に
+    /// volatileセマンティクスを使って行われる.
     #[inline(always)]
     fn write(&mut self, val: T) {
         unsafe { ::core::ptr::write_volatile(self.inner(), val) }
     }
 }
 
-/// Trait implemented by **readable _and_ writeable** volatile wrappers.
+/// **readable _and_ writeable** volatile ラッパーにより実装されるトレイト.
 pub trait ReadableWriteable<T>: Readable<T> + Writeable<T>
     where T: ::core::ops::BitAnd<Output = T>,
           T: ::core::ops::BitOr<Output = T>
 {
-    /// Applies the mask `mask` using `&` to the value referred to by `self`.
-    /// This is equivalent to `self.write(self.read() & mask)`.
+    /// `self` が参照する値に `&` を使ってマスク値 `mask` を適用する.
+    /// これは `self.write(self.read() & mask)` に相当する.
     fn and_mask(&mut self, mask: T) {
         let init_val = self.read();
         self.write(init_val & mask);
     }
 
-    /// Applies the mask `mask` using `|` to the value referred to by `self`.
-    /// This is equivalent to `self.write(self.read() | mask)`.
+    /// `self` が参照する値に `|` を使ってマスク値 `mask` を適用する.
+    /// これは `self.write(self.read() | mask)` に相当する.
     fn or_mask(&mut self, mask: T) {
         let init_val = self.read();
         self.write(init_val | mask);
     }
 }
-

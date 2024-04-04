@@ -71,38 +71,37 @@ impl<'a, T: 'a> StackVec<'a, T> {
         &mut self.storage[0..self.len]
     }
 
-    /// Extracts a slice containing the entire vector.
+    /// ベクタ全体を含むスライスを取り出す.
     pub fn as_slice(&self) -> &[T] {
         &self.storage[0..self.len]
     }
 
-    /// Extracts a mutable slice of the entire vector.
+    /// ベクタ全体を含むミュータブルスライスを取り出す.
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         &mut self.storage[0..self.len]
     }
 
-    /// Returns the number of elements in the vector, also referred to as its
-    /// 'length'.
+    /// ベクタの要素数（`length`とも呼ばれる）を返す.
     pub fn len(&self) -> usize {
         self.len
     }
 
-    /// Returns true if the vector contains no elements.
+    /// ベクタが要素を持たない場合、trueを返す.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    /// Returns true if the vector is at capacity.
+    /// ベクタが容量に達している場合、trueを返す.
     pub fn is_full(&self) -> bool {
         self.len() == self.capacity()
     }
 
-    /// Appends `value` to the back of this vector if the vector is not full.
+    /// ベクタが満杯でなければ`value`をベクタの末尾に追加する.
     ///
     /// # Error
     ///
-    /// If this vector is full, an `Err` is returned. Otherwise, `Ok` is
-    /// returned.
+    /// このベクタが満杯の場合、`Err` が返される。創でなければ
+    /// `Ok`が返される。
     pub fn push(&mut self, value: T) -> Result<(), ()> {
         if self.is_full() {
             return Err(());
@@ -127,8 +126,6 @@ impl<'a, T: Clone + 'a> StackVec<'a, T> {
     }
 }
 
-// FIXME: Implement `Deref`, `DerefMut`, and `IntoIterator` for `StackVec`.
-
 impl<'a, T: 'a> Deref for StackVec<'a, T> {
     type Target = [T];
 
@@ -152,7 +149,6 @@ impl<'a, T: 'a> IntoIterator for StackVec<'a, T> {
     }
 }
 
-// FIXME: Implement IntoIterator` for `&StackVec`.
 impl<'a, T: 'a> IntoIterator for &'a StackVec<'a, T> {
     type Item = &'a T;
     type IntoIter = Iter<'a, T>;
