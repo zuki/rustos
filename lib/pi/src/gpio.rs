@@ -4,7 +4,7 @@ use crate::common::{IO_BASE, states};
 use volatile::prelude::*;
 use volatile::{Volatile, WriteVolatile, ReadVolatile, Reserved};
 
-/// An alternative GPIO function.
+/// GPIOの代替機能.
 #[repr(u8)]
 pub enum Function {
     Input = 0b000,
@@ -46,32 +46,32 @@ struct Registers {
     PUDCLK: [Volatile<u32>; 2],
 }
 
-/// Possible states for a GPIO pin.
+/// GPIOピンの取りうるステート.
 #[allow(unused_doc_comments)]
 states! {
     Uninitialized, Input, Output, Alt
 }
 
-/// A GPIO pin in state `State`.
+/// ステート`State`にあるGPIOピン.
 ///
-/// The `State` generic always corresponds to an uninstantiatable type that is
-/// use solely to mark and track the state of a given GPIO pin. A `Gpio`
-/// structure starts in the `Uninitialized` state and must be transitions into
-/// one of `Input`, `Output`, or `Alt` via the `into_input`, `into_output`, and
-/// `into_alt` methods before it can be used.
+/// `State` ジェネリックは常にインスタンス化できない型に対応し、
+/// 与えられたGPIOピンのステートをマークして追跡するためだけに
+/// 使用される。`Gpio` 構造体は `Uninitialized` 状態からスタートし、
+/// 使用する前に `into_input`, `into_output`, `into_alt` の各メソッド
+/// を使って `Input`, `Output`, `Alt` のいずれかに遷移する必要がある。
 pub struct Gpio<State> {
     pin: u8,
     registers: &'static mut Registers,
     _state: PhantomData<State>
 }
 
-/// The base address of the `GPIO` registers.
+/// `GPIO` レジスタの基底アドレス.
 const GPIO_BASE: usize = IO_BASE + 0x200000;
 
 impl<T> Gpio<T> {
-    /// Transitions `self` to state `S`, consuming `self` and returning a new
-    /// `Gpio` instance in state `S`. This method should _never_ be exposed to
-    /// the public!
+    /// `self` をステート `S` に遷移させる. `self` を消費して
+    /// ステート `S` の新しい `Gpio` インスタンスを返す。
+    /// このメソッドは _絶対に_ 外に公開してはならない。
     #[inline(always)]
     fn transition<S>(self) -> Gpio<S> {
         Gpio {
@@ -83,11 +83,11 @@ impl<T> Gpio<T> {
 }
 
 impl Gpio<Uninitialized> {
-    /// Returns a new `GPIO` structure for pin number `pin`.
+    /// ピン番号 `pin` 用の 新規 `GPIO` 構造体を返す.
     ///
     /// # Panics
     ///
-    /// Panics if `pin` > `53`.
+    /// `pin` > `53` の場合はパニック.
     pub fn new(pin: u8) -> Gpio<Uninitialized> {
         if pin > 53 {
             panic!("Gpio::new(): pin {} exceeds maximum of 53", pin);
@@ -100,41 +100,57 @@ impl Gpio<Uninitialized> {
         }
     }
 
-    /// Enables the alternative function `function` for `self`. Consumes self
-    /// and returns a `Gpio` structure in the `Alt` state.
+    /// `self` の代替機能を `function` にする. selfを消費して
+    /// ステート `ALT` の `Gpio` 構造体を返す.
     pub fn into_alt(self, function: Function) -> Gpio<Alt> {
-        unimplemented!()
+        let g = self.pin as usize / 10;
+        let r = self.pin as usize % 10;
+        let f = function as u32;
+        self.registers.FSEL[g].write(f << r * 3);
+        self.transition()
     }
 
-    /// Sets this pin to be an _output_ pin. Consumes self and returns a `Gpio`
-    /// structure in the `Output` state.
+    /// このピンを _output_ ピンとして設定する. selfを消費して
+    /// ステート `Output` の `Gpio` 構造体を返す.
     pub fn into_output(self) -> Gpio<Output> {
         self.into_alt(Function::Output).transition()
     }
 
-    /// Sets this pin to be an _input_ pin. Consumes self and returns a `Gpio`
-    /// structure in the `Input` state.
+    /// このピンを _input_ ピンとして設定する. selfを消費して
+    /// ステート `Input` の `Gpio` 構造体を返す.
     pub fn into_input(self) -> Gpio<Input> {
         self.into_alt(Function::Input).transition()
     }
 }
 
 impl Gpio<Output> {
-    /// Sets (turns on) the pin.
+    /// ピンをセット（オンに）する.
     pub fn set(&mut self) {
-        unimplemented!()
+        if self.pin < 32 {
+            self.registers.SET[0].write(1 << self.pin);
+        } else {
+            self.registers.SET[1].write(1 << (self.pin - 32));
+        }
     }
 
-    /// Clears (turns off) the pin.
+    /// ピンをクリア（オフに）する.
     pub fn clear(&mut self) {
-        unimplemented!()
+        if self.pin < 32 {
+            self.registers.CLR[0].write(1 << self.pin);
+        } else {
+            self.registers.CLR[1].write(1 << (self.pin - 32));
+        }
     }
 }
 
 impl Gpio<Input> {
-    /// Reads the pin's value. Returns `true` if the level is high and `false`
-    /// if the level is low.
+    /// ピンの値を読み取る. レベルがhighの場合は`true`,
+    /// lowの場合は `false` を返す.
     pub fn level(&mut self) -> bool {
-        unimplemented!()
+        if self.pin < 32 {
+            self.registers.LEV[0].read() & (1 << self.pin) > 0
+        } else {
+            self.registers.LEV[1].read() & (1 << (self.pin - 32)) > 0
+        }
     }
 }
