@@ -20,10 +20,13 @@ use console::kprintln;
 // test your drivers (Phase 2). Add them as needed.
 use pi::timer;
 use pi::gpio::Gpio;
+use pi::uart;
 use core::time::Duration;
+use core::fmt::Write;
 
 unsafe fn kmain() -> ! {
     // FIXME: Start the shell.
+/*
     let mut leds = [
         Gpio::new(16).into_output(),
         Gpio::new(5).into_output()
@@ -37,5 +40,15 @@ unsafe fn kmain() -> ! {
             &leds[i].clear();
             pi::timer::spin_sleep(Duration::from_millis(200));
         }
+    }
+*/
+
+    let mut uart = uart::MiniUart::new();
+    &uart.write_str("hello, uart\n");
+
+    loop {
+        let byte = &uart.read_byte();
+        &uart.write_char(*byte as char);
+        //&uart.write_str("<-");
     }
 }
