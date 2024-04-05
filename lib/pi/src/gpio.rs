@@ -107,9 +107,8 @@ impl Gpio<Uninitialized> {
         let r = self.pin as usize % 10;
         let f = function as u32;
 
-        self.registers.FSEL[g].write(
-            (self.registers.FSEL[g].read() & !(0b111u32 << r * 3))
-                                           | (f << r * 3));
+        self.registers.FSEL[g].and_mask(!(0b111u32 << r * 3));
+        self.registers.FSEL[g].or_mask(f << r * 3);
         self.transition()
     }
 
