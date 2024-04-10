@@ -14,15 +14,15 @@ pub mod console;
 pub mod mutex;
 pub mod shell;
 
-use console::{CONSOLE, kprint, kprintln};
+//use console::{CONSOLE, kprint, kprintln};
 
 // FIXME: You need to add dependencies here to
 // test your drivers (Phase 2). Add them as needed.
-use pi::timer;
-use pi::gpio::Gpio;
-use pi::uart;
-use core::time::Duration;
-use core::fmt::Write;
+//use pi::timer;
+//use pi::gpio::Gpio;
+//use pi::uart;
+//use core::time::Duration;
+//use core::fmt::Write;
 
 unsafe fn kmain() -> ! {
     // FIXME: Start the shell.
