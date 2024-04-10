@@ -31,8 +31,8 @@ impl<T> Mutex<T> {
 }
 
 impl<T> Mutex<T> {
-    // Once MMU/cache is enabled, do the right thing here. For now, we don't
-    // need any real synchronization.
+    // MMU/キャッシュが有効になったら、ここで正しいことをする。
+    // 現時点では本当の同期は必要ない。
     pub fn try_lock(&self) -> Option<MutexGuard<T>> {
         let this = 0;
         if !self.lock.load(Ordering::Relaxed) || self.owner.load(Ordering::Relaxed) == this {
@@ -44,11 +44,11 @@ impl<T> Mutex<T> {
         }
     }
 
-    // Once MMU/cache is enabled, do the right thing here. For now, we don't
-    // need any real synchronization.
+    // MMU/キャッシュが有効になったら、ここで正しいことをする。
+    // 現時点では本当の同期は必要ない。
     #[inline(never)]
     pub fn lock(&self) -> MutexGuard<T> {
-        // Wait until we can "aquire" the lock, then "acquire" it.
+        // lockを「取得」できるまで待機して「取得」する.
         loop {
             match self.try_lock() {
                 Some(guard) => return guard,

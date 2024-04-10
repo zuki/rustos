@@ -1,27 +1,28 @@
 use stack_vec::StackVec;
+use core::str;
 
 use crate::console::{kprint, kprintln, CONSOLE};
 
-/// Error type for `Command` parse failures.
+/// `Command`のパースに失敗した際のエラー型.
 #[derive(Debug)]
 enum Error {
     Empty,
     TooManyArgs,
 }
 
-/// A structure representing a single shell command.
+/// 1つのシェルコマンドを表す構造体.
 struct Command<'a> {
     args: StackVec<'a, &'a str>,
 }
 
 impl<'a> Command<'a> {
-    /// Parse a command from a string `s` using `buf` as storage for the
-    /// arguments.
+    /// 文字列 `s` のコマンドをパースして引数を `buf` に格納する.
     ///
     /// # Errors
     ///
-    /// If `s` contains no arguments, returns `Error::Empty`. If there are more
-    /// arguments than `buf` can hold, returns `Error::TooManyArgs`.
+    /// If `s`に引数が含まれていない場合は `Error::Empty` を、
+    /// `buf`が保存可能な数以上の引数が存在した場合は
+    /// `Error::TooManyArgs` を返す。
     fn parse(s: &'a str, buf: &'a mut [&'a str]) -> Result<Command<'a>, Error> {
         let mut args = StackVec::new(buf);
         for arg in s.split(' ').filter(|a| !a.is_empty()) {
@@ -35,14 +36,64 @@ impl<'a> Command<'a> {
         Ok(Command { args })
     }
 
-    /// Returns this command's path. This is equivalent to the first argument.
+    /// このコマンドのパスを返す. これは第1引数に相当する。
     fn path(&self) -> &str {
-        unimplemented!()
+        self.args.as_slice()[0]
     }
 }
 
-/// Starts a shell using `prefix` as the prefix for each line. This function
-/// returns if the `exit` command is called.
-pub fn shell(prefix: &str) -> ! {
-    unimplemented!()
+/// 各行のプリフィックスとして`prefix`を使ってシェルを開始する。
+/// `exit`コマンドが呼び出されたらこの関数はリターンする。
+pub fn shell(prefix: &str) -> () {
+    let mut lbuf = [0u8; 512];
+    let mut line = StackVec::new(&mut lbuf);
+
+    kprint!("{}", prefix);
+    loop {
+        let mut console = CONSOLE.lock();
+        let byte = console.read_byte();
+        if byte == b'\r' || byte == b'\n' {
+            let mut buf = ["0"; 64];
+            match Command::parse(core::str::from_utf8(line.as_slice()).unwrap(), &mut buf) {
+                Ok(command) => {
+                    let path = &command.path();
+                    match path {
+                        &"echo" => {
+                            kprint!("\n");
+                            for i in 1..command.args.len() {
+                                kprint!("{} ", &command.args[i]);
+                            }
+                            kprint!("\n");
+                        }
+                        &"exit" => {
+                            kprintln!("\nexit");
+                            return;
+                        }
+                        _ => kprintln!("\nunknown command: {}", path),
+                    }
+                }
+                Err(e) => match e {
+                    Error::Empty => kprint!("\n"),
+                    Error::TooManyArgs => kprintln!("\nerror: too many arguments"),
+                },
+            }
+            line.truncate(0);
+            kprint!("{}", prefix);
+        } else if byte == b'\x08' || byte == b'\x7f' {
+            if line.len() != 0 {
+                line.pop();
+                &console.write_byte(b'\x08');
+                &console.write_byte(b'\x20');
+                &console.write_byte(b'\x08');
+            }
+        } else if byte < b'\x20' {
+            &console.write_byte(b'\x07');
+        } else {
+            line.push(byte);
+            &console.write_byte(byte);
+            if line.is_full() {
+                &console.write_byte(b'\x07');
+            }
+        }
+    }
 }

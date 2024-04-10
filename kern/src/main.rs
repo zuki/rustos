@@ -14,7 +14,7 @@ pub mod console;
 pub mod mutex;
 pub mod shell;
 
-use console::kprintln;
+use console::{CONSOLE, kprint, kprintln};
 
 // FIXME: You need to add dependencies here to
 // test your drivers (Phase 2). Add them as needed.
@@ -41,8 +41,6 @@ unsafe fn kmain() -> ! {
             pi::timer::spin_sleep(Duration::from_millis(200));
         }
     }
-*/
-
     let mut uart = uart::MiniUart::new();
     &uart.write_str("hello, uart\n");
 
@@ -51,4 +49,19 @@ unsafe fn kmain() -> ! {
         &uart.write_char(*byte as char);
         //&uart.write_str("<-");
     }
+
+
+kprintln!("hello, console");
+
+    loop {
+        let mut console = CONSOLE.lock();
+        let byte = &console.read_byte();
+        &console.write_char(*byte as char);
+    }
+*/
+    loop {
+        shell::shell("> ");
+        loop {}
+    }
+
 }
