@@ -85,7 +85,7 @@ impl MiniUart {
     /// バイト `byte` を書き出す. 出力FIFOに空きができるmで
     /// このメソッドはブロックする.
     pub fn write_byte(&mut self, byte: u8) {
-        while (self.registers.MU_LSR.read() & LsrStatus::TxAvailable as u32 == 0) {}
+        while self.registers.MU_LSR.read() & LsrStatus::TxAvailable as u32 == 0 {}
         self.registers.MU_IO.write(byte as u32);
     }
 
@@ -135,17 +135,12 @@ impl MiniUart {
 // FIXME: MiniUart`に対して`fmt::Write`を実装する。b'\n' バイトを
 // 書き込む前に b'\r' バイトを書き込む。
 impl fmt::Write for MiniUart {
-    fn write_char(&mut self, c: char) -> Result<(), core::fmt::Error> {
-        self.write_byte(c as u8);
-        if c == '\r' {
-            self.write_byte(b'\n');
-        }
-        Ok(())
-    }
-
     fn write_str(&mut self, s: &str) -> Result<(), core::fmt::Error> {
-        for c in s.chars() {
-            self.write_char(c);
+        for byte in s.as_bytes().iter() {
+            if *byte == b'\n' {
+                self.write_byte(b'\r');
+            }
+            self.write_byte(*byte);
         }
         Ok(())
     }

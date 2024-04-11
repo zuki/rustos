@@ -41,27 +41,27 @@ unsafe fn kmain() -> ! {
             pi::timer::spin_sleep(Duration::from_millis(200));
         }
     }
+
     let mut uart = uart::MiniUart::new();
     &uart.write_str("hello, uart\n");
 
     loop {
-        let byte = &uart.read_byte();
-        &uart.write_char(*byte as char);
+        let byte = uart.read_byte();
+        &uart.write_byte(byte);
         //&uart.write_str("<-");
     }
 
 
-kprintln!("hello, console");
+    kprintln!("hello, console");
 
     loop {
         let mut console = CONSOLE.lock();
-        let byte = &console.read_byte();
-        &console.write_char(*byte as char);
+        let byte = console.read_byte();
+        &console.write_byte(byte);
     }
 */
     loop {
         shell::shell("> ");
         loop {}
     }
-
 }
