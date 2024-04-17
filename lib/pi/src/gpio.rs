@@ -65,9 +65,6 @@ pub struct Gpio<State> {
     _state: PhantomData<State>,
 }
 
-/// `GPIO` レジスタの基底アドレス.
-const GPIO_BASE: usize = IO_BASE + 0x200000;
-
 impl<T> Gpio<T> {
     /// `self` をステート `S` に遷移させる. `self` を消費して
     /// ステート `S` の新しい `Gpio` インスタンスを返す。

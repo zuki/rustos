@@ -5,6 +5,7 @@
 #![feature(global_asm)]
 #![feature(optin_builtin_traits)]
 #![feature(raw_vec_internals)]
+#![feature(panic_info_message)]
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(not(test), no_main)]
 
@@ -19,7 +20,7 @@ pub mod fs;
 pub mod mutex;
 pub mod shell;
 
-//use console::{CONSOLE, kprint, kprintln};
+use console::{CONSOLE, kprint, kprintln};
 
 use allocator::Allocator;
 use fs::FileSystem;
@@ -36,4 +37,5 @@ fn kmain() -> ! {
 
     kprintln!("Welcome to cs3210!");
     shell::shell("> ");
+    loop {}
 }

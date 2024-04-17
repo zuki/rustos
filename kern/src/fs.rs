@@ -62,4 +62,6 @@ impl FileSystem {
 }
 
 // FIXME: Implement `fat32::traits::FileSystem` for `&FileSystem`
+/*
 impl fat32::traits::FileSystem for &FileSystem {}
+*/
