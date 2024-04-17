@@ -13,7 +13,7 @@ use structopt::StructOpt;
 use serial::core::{CharSize, BaudRate, StopBits, FlowControl, SerialDevice};
 
 use parsers::{parse_width, parse_stop_bits, parse_flow_control, parse_baud_rate};
-use serial::{SerialPort, PortSettings, SystemPort};
+use serial::{SerialPort, PortSettings};
 
 #[derive(StructOpt, Debug)]
 #[structopt(about = "Write to TTY using the XMODEM protocol by default.")]
@@ -52,6 +52,7 @@ fn progress_fn(progress: Progress) {
     println!("Progress: {:?}", progress);
 }
 
+/*
 fn send_full(input: &mut dyn io::Read, port: &mut SystemPort, raw: bool) -> io::
 Result<usize> {
     if raw {
@@ -63,7 +64,7 @@ Result<usize> {
 
     Xmodem::transmit_with_progress(input, port, progress_fn)
 }
-
+ */
 
 fn main() {
     use std::fs::File;
@@ -85,9 +86,28 @@ fn main() {
     SerialDevice::set_timeout(&mut port, Duration::from_secs(opt.timeout)).expect("failed to set timeout");
 
     loop {
+        let input_path: PathBuf;
+        if let Some(path) = &opt.input {
+            input_path = path.to_path_buf();
+        } else {
+            input_path = PathBuf::from("/home/vagrant/rustos/kern/build/kernel.bin");
+        }
+        let source = File::open(input_path).expect("failed to open file");
+        match Xmodem::transmit_with_progress(&source, &mut port, progress_fn) {
+            Ok(n) => {
+                println!("wrote {} bytes", n);
+                return;
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::InvalidData => continue,
+            Err(e) => {
+                println!("\nFailed to send: {}", e);
+                break;
+            }
+        }
+/*
         let mut source: Box<dyn io::Read>;
         if let Some(path) = &opt.input {
-            source = Box::new(File::open(path).expect("failted to open file"));
+            source = Box::new(BufReader::new(File::open(path).expect("failed to open file")));
         } else {
             source = Box::new(io::stdin());
         }
@@ -103,5 +123,6 @@ fn main() {
                 break;
             }
         }
+*/
     }
 }
