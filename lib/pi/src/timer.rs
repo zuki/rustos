@@ -2,7 +2,7 @@ use crate::common::IO_BASE;
 use core::time::Duration;
 
 use volatile::prelude::*;
-use volatile::{Volatile, ReadVolatile};
+use volatile::{ReadVolatile, Volatile};
 
 /// ARMシステムタイマーレジスタの基底アドレス.
 const TIMER_REG_BASE: usize = IO_BASE + 0x3000;
@@ -13,12 +13,12 @@ struct Registers {
     CS: Volatile<u32>,
     CLO: ReadVolatile<u32>,
     CHI: ReadVolatile<u32>,
-    COMPARE: [Volatile<u32>; 4]
+    COMPARE: [Volatile<u32>; 4],
 }
 
 /// Raspberry PiのARMシステムタイマー.
 pub struct Timer {
-    registers: &'static mut Registers
+    registers: &'static mut Registers,
 }
 
 impl Timer {

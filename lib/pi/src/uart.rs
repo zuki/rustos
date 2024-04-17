@@ -1,15 +1,15 @@
 use core::fmt;
 use core::time::Duration;
 
-use shim::io;
 use shim::const_assert_size;
+use shim::io;
 
 use volatile::prelude::*;
-use volatile::{Volatile, ReadVolatile, Reserved};
+use volatile::{ReadVolatile, Reserved, Volatile};
 
-use crate::timer;
 use crate::common::IO_BASE;
-use crate::gpio::{Gpio, Function};
+use crate::gpio::{Function, Gpio};
+use crate::timer;
 
 /// `MU` レジスタの基底アドレス.
 const MU_REG_BASE: usize = IO_BASE + 0x215040;

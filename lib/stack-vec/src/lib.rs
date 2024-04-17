@@ -21,7 +21,7 @@ use core::slice::{Iter, IterMut};
 #[derive(Debug)]
 pub struct StackVec<'a, T: 'a> {
     storage: &'a mut [T],
-    len: usize
+    len: usize,
 }
 
 impl<'a, T: 'a> StackVec<'a, T> {

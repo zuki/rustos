@@ -1,7 +1,17 @@
+use shim::io;
+use shim::path::{Path, PathBuf};
+
 use stack_vec::StackVec;
 use core::str;
 
+use pi::atags::Atags;
+
+use fat32::traits::FileSystem;
+use fat32::traits::{Dir, Entry};
+
 use crate::console::{kprint, kprintln, CONSOLE};
+use crate::ALLOCATOR;
+use crate::FILESYSTEM;
 
 /// `Command`のパースに失敗した際のエラー型.
 #[derive(Debug)]
