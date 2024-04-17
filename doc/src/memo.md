@@ -1,4 +1,4 @@
-# Lab2: StackVec
+# Lab2, Phase 1, Subphase A: StackVec
 
 ## unimplemented()を実装、トレイト未実装の時点
 
@@ -311,7 +311,7 @@ running 0 tests
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
 
-# Lab2: XMODEM
+# Lab2, Phase 1, Subphase C: XMODEM
 
 ```bash
 $ cargo test
@@ -386,7 +386,7 @@ running 0 tests
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
 
-# ttywrite
+# Lab2, Phase 1, Subphase D: ttywrite
 
 ```bash
 $ cargo run -- --help
@@ -643,7 +643,7 @@ error: proc-macro derive panicked
 
 ```
 
-# crateのバージョンをいくつか変更
+## crateのバージョンをいくつか変更
 
 - `cfg-if`クレート
    `__cfg_if_items!`マクロは0.1ではあったがその後なくなった。今ではもう"cfg0if = 0.1"指定では
@@ -806,7 +806,7 @@ drwxrwxr-x 2 vagrant vagrant    4096 Apr  3 11:40 native
 -rw-rw-r-- 1 vagrant vagrant     419 Apr  3 11:41 ttywrite.d
 ```
 
-## console
+# Lab2, Phase 2, Subphase E: Shell - console
 
 - 実機で動かない
    kprintlnマクロで首都力している`hello, console`も表示されない
@@ -829,7 +829,7 @@ egade
 QEMU: Terminated
 ```
 
-## shellの実装
+# Lab2, Phase 2, Subphase E: Shell
 
 ```bash
 $ ../bin/qemu-system-aarch64 -nographic -M raspi3 -serial null -serial mon:stdio -kernel build/kernel.bin
@@ -881,48 +881,10 @@ hello, world
 exit        # esc-A Zでminicom終了
 ```
 
-# macでcargo-xbuildのインストールに失敗
 
-```bash
-   Compiling ryu v1.0.0
-error: linking with `cc` failed: exit code: 1
-  |
-  = note: "cc" "-m64" "-L" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib" "/Users/dspace/.dep/cargo-xbuild/target/release/build/ryu-d64686b3f2d4be3f/build_script_build-d64686b3f2d4be3f.build_script_build.6hsnh4t3-cgu.0.rcgu.o" "/Users/dspace/.dep/cargo-xbuild/target/release/build/ryu-d64686b3f2d4be3f/build_script_build-d64686b3f2d4be3f.build_script_build.6hsnh4t3-cgu.1.rcgu.o" "/Users/dspace/.dep/cargo-xbuild/target/release/build/ryu-d64686b3f2d4be3f/build_script_build-d64686b3f2d4be3f.build_script_build.6hsnh4t3-cgu.10.rcgu.o" "/Users/dspace/.dep/cargo-xbuild/target/release/build/ryu-d64686b3f2d4be3f/build_script_build-d64686b3f2d4be3f.build_script_build.6hsnh4t3-cgu.11.rcgu.o" "/Users/dspace/.dep/cargo-xbuild/target/release/build/ryu-d64686b3f2d4be3f/build_script_build-d64686b3f2d4be3f.build_script_build.6hsnh4t3-cgu.12.rcgu.o" "/Users/dspace/.dep/cargo-xbuild/target/release/build/ryu-d64686b3f2d4be3f/build_script_build-d64686b3f2d4be3f.build_script_build.6hsnh4t3-cgu.2.rcgu.o" "/Users/dspace/.dep/cargo-xbuild/target/release/build/ryu-d64686b3f2d4be3f/build_script_build-d64686b3f2d4be3f.build_script_build.6hsnh4t3-cgu.3.rcgu.o" "/Users/dspace/.dep/cargo-xbuild/target/release/build/ryu-d64686b3f2d4be3f/build_script_build-d64686b3f2d4be3f.build_script_build.6hsnh4t3-cgu.4.rcgu.o" "/Users/dspace/.dep/cargo-xbuild/target/release/build/ryu-d64686b3f2d4be3f/build_script_build-d64686b3f2d4be3f.build_script_build.6hsnh4t3-cgu.5.rcgu.o" "/Users/dspace/.dep/cargo-xbuild/target/release/build/ryu-d64686b3f2d4be3f/build_script_build-d64686b3f2d4be3f.build_script_build.6hsnh4t3-cgu.6.rcgu.o" "/Users/dspace/.dep/cargo-xbuild/target/release/build/ryu-d64686b3f2d4be3f/build_script_build-d64686b3f2d4be3f.build_script_build.6hsnh4t3-cgu.7.rcgu.o" "/Users/dspace/.dep/cargo-xbuild/target/release/build/ryu-d64686b3f2d4be3f/build_script_build-d64686b3f2d4be3f.build_script_build.6hsnh4t3-cgu.8.rcgu.o" "/Users/dspace/.dep/cargo-xbuild/target/release/build/ryu-d64686b3f2d4be3f/build_script_build-d64686b3f2d4be3f.build_script_build.6hsnh4t3-cgu.9.rcgu.o" "-o" "/Users/dspace/.dep/cargo-xbuild/target/release/build/ryu-d64686b3f2d4be3f/build_script_build-d64686b3f2d4be3f" "/Users/dspace/.dep/cargo-xbuild/target/release/build/ryu-d64686b3f2d4be3f/build_script_build-d64686b3f2d4be3f.4u0xhml8z5z9pu1v.rcgu.o" "-Wl,-dead_strip" "-nodefaultlibs" "-L" "/Users/dspace/.dep/cargo-xbuild/target/release/deps" "-L" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/libstd-ebf2c4fba300d33c.rlib" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/libpanic_unwind-7229a2ed0a63ac57.rlib" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/libbacktrace-d667a1ed12c3225b.rlib" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/libbacktrace_sys-95c3fb787955f318.rlib" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/librustc_demangle-3e8385e4bf12ab62.rlib" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/libhashbrown-d619a00da08140e9.rlib" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/librustc_std_workspace_alloc-54447d0954eb6d31.rlib" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/libunwind-d418ac01cb8eb17e.rlib" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/libcfg_if-b4b855a2a137e1da.rlib" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/liblibc-dcca354f696a82cd.rlib" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/liballoc-23a0b38b7b055bae.rlib" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/librustc_std_workspace_core-44d80a1ddf142ecf.rlib" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/libcore-cfa39344cede6f40.rlib" "/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/libcompiler_builtins-1a9e57c727fcf5e1.rlib" "-lSystem" "-lresolv" "-lc" "-lm"
-  = note: ld: in /Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/libpanic_unwind-7229a2ed0a63ac57.rlib(rust.metadata.bin), archive member 'rust.metadata.bin' with length 25664 is not mach-o or llvm bitcode file '/Users/dspace/.rustup/toolchains/nightly-2019-07-01-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib/libpanic_unwind-7229a2ed0a63ac57.rlib'
-          clang: error: linker command failed with exit code 1 (use -v to see invocation)
-```
+# Linuxでttywriteを実行
 
-- [https://github.com/rust-lang/rust/issues/107252](https://github.com/rust-lang/rust/issues/107252)によると`XCode 14 broke rustc 1.53 and older. You have to update to at least rustc 1.54 or downgrade to XCode 13 or older.`
-- rustupを最新版にしてinstallを実行すると別のエラー。rustc-serializeの最新バージョンは0.3.25だが該当コードは同じ。
-
-```bash
-   Compiling rustc-serialize v0.3.24
-error[E0310]: the parameter type `T` may not live long enough
-    --> /Users/dspace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/serialize.rs:1155:5
-     |
-1155 |     fn decode<D: Decoder>(d: &mut D) -> Result<Cow<'static, T>, D::Error...
-     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     |     |
-     |     the parameter type `T` must be valid for the static lifetime...
-     |     ...so that the type `T` will meet its required lifetime bounds...
-     |
-note: ...that is required by this bound
-    --> /rustc/25ef9e3d85d934b27d9dada2f9dd52b1dc63bb04/library/alloc/src/borrow.rs:180:30
-help: consider adding an explicit lifetime bound
-     |
-1151 | impl<'a, T: ?Sized + 'static> Decodable for Cow<'a, T>
-     |                    +++++++++
-
-   Compiling remove_dir_all v0.5.2
-   Compiling semver v0.1.20
-For more information about this error, try `rustc --explain E0310`.
-error: could not compile `rustc-serialize` (lib) due to 1 previous error
-warning: build failed, waiting for other jobs to finish...
-error: failed to compile `cargo-xbuild v0.5.20 (/Users/dspace/.dep/cargo-xbuild)`, intermediate artifacts can be found at `/Users/dspace/.dep/cargo-xbuild/target`.
-To reuse those artifacts with a future compilation, set the environment variable `CARGO_TARGET_DIR` to that path.
-```
-
-# Linux
+- USBシリアルデバイスがVirtualBoxで動いた(USBデバイスを登録)
 
 ```bash
 $ sudo dmesg
@@ -941,7 +903,7 @@ $ sudo dmesg
 [  112.657566] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB0
 ```
 
-# boot
+## Lab2, Phase 3: ブート
 
 1. 端末1でminicom
 
@@ -985,7 +947,7 @@ libstd/io/mod.rs:                           "failed to fill whole buffer"))
 libstd/sys/unix/ext/fs.rs:                               "failed to fill whole buffer"))
 ```
 
-## `libstd/io/impls.rs`
+### `libstd/io/impls.rs`
 
 ```rust
 impl Read for &[u8] {
@@ -1012,7 +974,7 @@ impl Read for &[u8] {
 }
 ```
 
-## `libstd/io/mod.rs`
+### `libstd/io/mod.rs`
 
 ```rust
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -1037,7 +999,7 @@ pub trait Read {
 }
 ```
 
-## `libstd/sys/unix/ext/fs.rs`
+### `libstd/sys/unix/ext/fs.rs`
 
 - 引数にオフセットを取るのでこれではない
 
@@ -1066,7 +1028,7 @@ pub trait Read {
     }
 ```
 
-# ブートローダ
+## Linuxでの実行が成功
 
 - 実行環境だけで動くようにttywriteを変更(sysinからの入力機能を削除)
 - 端末1でminicom実行、端末2でttywriteを実行
@@ -1074,3 +1036,7 @@ pub trait Read {
 - 転送が終了したら端末1で改行を押すとkernelの実行が開始する
 
 ![ブートローダ](images/bootloader.png)
+
+# Lab3: Phase 1, Subphase A: Panic!
+
+![panic画面](images/panic.png)
