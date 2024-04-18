@@ -160,3 +160,171 @@ index out of bounds: the len is 3 but the index is 4
 方法でカーネルをパニックにしてみてください。そしてすべてが期待通りに
 操作することを確認してください。実装に満足したら次のサブフェーズに
 進んでください。
+
+### サブフェーズB: ATAGS
+
+このサブフェーズではRaspberry Piのファームウェアによってロードされる
+ARMタグ（ATAGS）に対するイテレータを実装します。イテレータを使って
+システムで利用可能なメモリ量を指定するATAGを見つけます。`lib/pi/src/atags`
+ディレクトリと`kern/src/allocator.rs`で作業します。
+
+#### ARMタグ
+
+[ATAGS](http://www.simtec.co.uk/products/SWLINUX/files/booting_article.html#d0e428)（ARMタグ）は
+ARMブートローダやファームウェアがシステムに関する情報をカーネルに渡す
+ために使用するメカニズムです。たとえば、LinuxはARMアーキテクチャ用に
+構成されているとATAGSを使用することができます。
+
+Raspberry Piはアドレス0x100にATAG構造体の配列を配置します。以下はATAGS
+構造をRust構文で書いたものです。
+
+```rust
+#[repr(C)]
+struct Atag {
+    dwords: u32,
+    tag: u32,
+    kind: Kind
+}
+```
+
+ATAGは8バイトのヘッダーである`dwords`と`tag`で始まります。`dwords`
+フィールドは全ATAGのサイズを _ダブルワード_（32 ビットワード）単位で
+指定します。これにはヘッダーも含まれます。したがって、最小サイズは`2`
+です。`tag`フィールドはATAGのタイプを指定します。10種類のタグが指定されて
+おり[ATAGSリファレンス](http://www.simtec.co.uk/products/SWLINUX/files/booting_article.html#d0e428)にすべて記載されています。Raspberry Piは4つ
+しか使用しません。以下はその説明です。
+
+| 名前 | タイプ(`tag`) | サイズ | 説明 |
+|:-----|:--------------|:-------|:-----|
+| [CORE](file:///Users/dspace/xv6_memos/book/raspi/booting_arm_linux.html#atag_core) | 0x54410001 | 5, 空の場合は2  | リストの開始に使用する最初のタグ |
+| [NONE](file:///Users/dspace/xv6_memos/book/raspi/booting_arm_linux.html#atag_none) | 0x00000000 | 2 | リストの終端に使用するエンプティタグ |
+| [MEM](file:///Users/dspace/xv6_memos/book/raspi/booting_arm_linux.html#atag_mem) | 0x54410002 | 4 | 物理メモリ領域を記述する |
+| [CMDLINE](file:///Users/dspace/xv6_memos/book/raspi/booting_arm_linux.html#atag_cmdline) | 0x54410009 | 可変 | カーネルに渡すコマンドライン |
+
+タグのタイプはヘッダー後のデータがどのように解釈されるべきかを決めます。
+スケルトンコードではヘッダーに続くデータは様々な種類のタグのunionである
+`kind`という名前のフィールドで表現されています。上の表でタグの名前を
+クリックするとそのタグのデータレイアウトを含むタグのリファレンスに
+ジャンプします。たとえば、`MEM`タグのデータは以下のような構造になって
+います。
+
+```c
+struct Mem {
+    size: u32,
+    start: u32
+}
+```
+
+タグはメモリ上に順次配置され、各タグ間は0詰めされています。最初のタグは
+`CORE`タグと規定されており、最後のタグは`NONE`タグで示されます。その他の
+タグの順番は任意です。`dwords`フィールドは隣接するATAGのアドレスの決定に
+使用されます。下図は一般的なレイアウトを示しています。
+
+![ATAGSレイアウト](atags.png)
+
+#### Unionと安全性
+
+生のATAGデータ構造体は`lib/pi/src/atags/raw.rs`で宣言されています。以下に
+コピーしたメインの宣言ではRustの`union`を使用しています。Rustのunionは
+Cのユニオンと同じで、すべてのフィールドが共通のストレージを共有する構造を
+定義します。
+
+```rust
+pub struct Atag {
+    dwords: u32,
+    tag: u32,
+    kind: Kind
+}
+
+pub union Kind {
+    core: Core,
+    mem: Mem,
+    cmd: Cmd
+}
+```
+
+事実上、unionはそのキャストが正しいかどうかに関係なく、メモリを任意の
+構造体にキャストできます。そのためRustにおけるunionフィールドのアクセスは
+unsafeです。
+
+`atags`モジュールですでに大部分のunsafeを処理しているのでunionの扱いに
+ついては心配する必要はありません。とはいえ、`pi`ライブラリのエンドユーザに
+unionを公開するのは悪い考えです。そのため、`lib/pi/src/atags/atag.rs`に
+2つ目の`Atag`構造体を宣言しました。この構造体の使用とアクセスは完全に
+安全です。これが`pi`ライブラリが公開する構造体です。このサブフェーズの
+後半で`atag`モジュールの実装を終える際に`raw`構造体から安全な構造体への
+変換を書くことになります。
+
+**質問 (enduser-unssfe): エンドユーザにunionを公開するのはなぜ悪い考えなのか**
+> unsafeなデータ構造を安全なインターフェイスを公開するために多くの労力を
+> 費やしてきています。標準ライブラリを代表例としてRustではこのようなことが
+> 何度も何度も見られます。Rustでunsafeな構造体や操作を安全なインタフェースで
+> 公開することにどのような利点があるのでしょうか。C言語のような言語でも
+> 同じような利点が得られるでしょうか。
+
+#### コマンドライン引数
+
+`CMDLINE`タグは特に注目に値します。その定義は次のとおりです。
+
+```rust
+struct Cmd {
+    /// コマンドライン文字列の最初のバイト
+    cmd: u8
+}
+```
+
+コメントで示したように`cmd`フィールドはコマンドライン文字列の最初の
+バイトを保持します。言い換えれば、`&cmd`はCと同様なヌル終端の文字列への
+ポインタです。安全版の`Cmd`タグは`Cmd(&'static str)`です。`raw`の`Cmd`
+タグから安全版の`Cmd`タグへの変換を記述する場合、文字列内でヌル終端を
+検索してC類似の文字列のサイズを決定する必要があります。次に、そのアドレスとサイズを`slice::from_raw_parts()`を使ってスライスにキャストし、最後に
+そのスライスを`str::from_utf8()`か`str::from_utf8_unchecked()`を使って
+文字列にキャストする必要があります。この2つの関数はラボ2で使っています。
+
+#### `atgs`の実装
+
+これで`lib/pi/src/atags`にある`atags`モジュールを実装する準備ができました。
+`atags/raw.rs`にある`raw::Atag::next()`メソッドの実装から始めましょう。
+このメソッドは`self`に続くATAGのアドレスを決定し、その参照を返します。
+実装では`unsafe`を使用する必要があります。次に、`atags/atag.rs`にある
+ヘルパーメソッドとraw構造体から安全な構造体へ変換するトレイトを実装
+します。`unsafe`を使用する必要があるのは`From<&'a raw::Cmd> for Atag`を
+実装するときだけです。最後に、`atags/mod.rs`にある`Atag`用の
+`Iterator`トレイトの実装を完了させます。これには`unsafe`は必要ありません。
+
+**ヒント**
+> `x as *const T as *const u32`を使って`x: &T`から`*const u32`へ変換する
+> ことができます。
+
+**ヒント**
+> `&*x`を使って`x: *const T`から`T`に変換することができます・しかし、
+> この変換は**極めて**unsafeです。Rust参照のエイリアス規則に違反しない
+> ように注意してください。
+
+**ヒント**
+> ポインタ演算は`add()`, `sub()`, `offset()`で実行できます。
+
+#### `atggs`のテスト
+
+`lib/pi`ディレクトリで`cargo test`コマンドを実行して実装をテストして
+ください。次に、`kern/src/main.rs`にすべてのATAGSを走査してコンソールに
+デバッグプリントするコードを書いてRPiボードでATAGS実装をテストしてください。
+3つの`NONE`以外のタグが少なくとも1つずつ表示されるはずです。それぞれの
+ATAGの値が期待通りであることを確認してください。実装が期待通りに実行
+されたら、次のサブフェーズに進んでください。
+
+**ヒント**
+フォーマット指定子`{:#?}`は構造体のデバッグ出力をプリティにします。
+
+**質問 (atag-cmdlin): `CMDLINE` ATAGには何が含まれていますか**
+Raspberry Piで見つかった`CMDLINE` ATAGに含まれているコマンドライン文字列
+の値は何ですか。そのパラメータは何を制御していると思いますか。
+
+    `"bcm2708_fb.fbwidth=656 bcm2708_fb.fbheight=416 bcm2708_fb.fbswap=1 dma.dmachans=0x7f35 bcm2709.boardrev=0xa020d3 bcm2709.serial=0x4aabe848 bcm27...`
+
+**質問  (atag-mem): `MEM`タグではどのくらいのメモリが報告されましたか**
+> `MEM` ATAGによって報告される利用可能なメモリの正確な開始アドレスと
+> サイズは何でしたか。これはRaspberry Piの1GBのRAMと言われているものに
+> どれくらい近いですか。
+
+    開始アドレスは 0x0, サイズは 994,050,048

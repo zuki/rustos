@@ -24,18 +24,43 @@ use console::{CONSOLE, kprint, kprintln};
 
 use allocator::Allocator;
 use fs::FileSystem;
+use pi::atags;
 
 #[cfg_attr(not(test), global_allocator)]
 pub static ALLOCATOR: Allocator = Allocator::uninitialized();
 pub static FILESYSTEM: FileSystem = FileSystem::uninitialized();
 
 fn kmain() -> ! {
+/*
     unsafe {
         ALLOCATOR.initialize();
         FILESYSTEM.initialize();
     }
-
+*/
     kprintln!("Welcome to cs3210!");
-    shell::shell("> ");
+
+    let mut atags = atags::Atags::get();
+    loop {
+        match atags.next() {
+            Some(atag) => {
+                match atag.cmd() {
+                    Some(cmd) => {
+                        kprintln!("Cmd(");
+                        let mut iter = cmd.split_whitespace();
+                        loop {
+                            match iter.next() {
+                                Some(item) => kprintln!("  {}", item),
+                                None => break,
+                            }
+                        }
+                        kprintln!(")");
+                    }
+                    _ => kprintln!("{:#?}", atag),
+                }
+            }
+            None => break,
+        }
+    }
+//    shell::shell("> ");
     loop {}
 }

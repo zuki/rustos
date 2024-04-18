@@ -1039,4 +1039,44 @@ pub trait Read {
 
 # Lab3: Phase 1, Subphase A: Panic!
 
+PanicInfoのmessageを得ようとして`error[E0658]: use of unstable library feature 'panic_info_message'`のエラーが発生。`#![feature(panic_info_message)]`をcrate rootに
+書くよう指示があった。この場合のcrate rootは`kern/main.rs`だった。
+
 ![panic画面](images/panic.png)
+
+## lab3, Phase 1, Subphase B: ATAGS
+
+```bash
+$ cd lib/pi
+$ cargo build
+   Compiling pi v0.1.0 (/home/vagrant/rustos/lib/pi)
+
+    Finished dev [unoptimized + debuginfo] target(s) in 0.38s
+
+$ cargo test
+   Compiling pi v0.1.0 (/home/vagrant/rustos/lib/pi)
+
+    Finished dev [unoptimized + debuginfo] target(s) in 0.95s
+     Running target/debug/deps/pi-0aadc94077046b1b
+
+running 1 test
+test atags::test::test_atags ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+   Doc-tests pi
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+$ cd ../../kern
+$ make
++ Building build/kernel.elf [xbuild/build]
+   Compiling kernel v0.1.0 (/home/vagrant/rustos/kern)
+
+    Finished release [optimized] target(s) in 0.86s
++ Building build/kernel.bin [objcopy]
+```
+
+![atags](images/pi_atags.png)

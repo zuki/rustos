@@ -1,4 +1,4 @@
-/// A raw `ATAG` as laid out in memory.
+/// メモリにレイアウトされている通りの生の`ATAG`.
 #[repr(C)]
 pub struct Atag {
     pub dwords: u32,
@@ -20,11 +20,18 @@ impl Atag {
 
     /// FIXME: Returns the ATAG following `self`, if there is one.
     pub fn next(&self) -> Option<&Atag> {
-        unimplemented!()
+        if self.tag == Atag::NONE {
+            None
+        } else {
+            let mut atag = (self as *const Atag) as *const u32;
+            atag = unsafe { atag.add(self.dwords as usize) };
+            let next = unsafe { &*(atag as *const Atag) };
+            Some(next)
+        }
     }
 }
 
-/// The possible variant of an ATAG.
+/// ATAGのバリアント.
 #[repr(C)]
 pub union Kind {
     pub core: Core,
@@ -53,6 +60,6 @@ pub struct Mem {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct Cmd {
-    /// The first byte of the command line string.
+    /// コマンドライン文字列の最初のバイト
     pub cmd: u8,
 }

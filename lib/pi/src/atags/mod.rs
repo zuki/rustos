@@ -3,16 +3,17 @@ mod raw;
 
 pub use self::atag::*;
 
-/// The address at which the firmware loads the ATAGS.
+/// ファームウェアがATAGSをロードするアドレス.
 const ATAG_BASE: usize = 0x100;
 
-/// An iterator over the ATAGS on this system.
+/// このシステムのATAGSに対するイテレータ.
 pub struct Atags {
     ptr: Option<&'static raw::Atag>,
 }
 
 impl Atags {
-    /// Returns an instance of `Atags`, an iterator over ATAGS on this system.
+    /// Returns an instance of `Atags`のインスタンスを返す,
+    /// このシステムのATAGSに対するイテレータ.
     pub fn get() -> Atags {
         Atags {
             ptr: Some(unsafe { &*(ATAG_BASE as *const raw::Atag) }),
@@ -25,7 +26,14 @@ impl Iterator for Atags {
 
     // FIXME: Implement `Iterator` for `Atags`
     fn next(&mut self) -> Option<Atag> {
-        unimplemented!()
+        match self.ptr {
+            Some(ptr) => {
+                let saved = Atag::from(ptr);
+                self.ptr = ptr.next();
+                Some(saved)
+            }
+            None => None,
+        }
     }
 }
 
