@@ -1122,4 +1122,15 @@ test result: FAILED. 10 passed; 10 failed; 0 ignored; 0 measured; 0 filtered out
 
 ### ユーティリティ: `memory_map`の実装
 
+- `memory_map()`に`page_size`変数 (4KB) が定義されているが
+  どのように使用するかの説明がない
+- 当初はこのサイズで開始アドレスはalign_up、終了アドレスはalign_down
+  したが、lab4, lab5の説明にもないようなので無視することにした
+
+(1) page_sizeでalign_up/down死た場合
+
 ![memory_mapの実行](images/panic_bin_allocator.png)
+
+(2) page_sizeを無視した場合
+
+![memory_mapの実行](images/panic_bin_allocator_2.png)

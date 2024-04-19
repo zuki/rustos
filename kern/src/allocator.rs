@@ -78,23 +78,23 @@ extern "C" {
 ///
 /// 通常の状態であればこの関数は`Some`を返すことが期待される。
 pub fn memory_map() -> Option<(usize, usize)> {
-    let page_size = 1 << 12;
+    let _page_size = 1 << 12;
     let binary_end = unsafe { (&__text_end as *const u8) as usize };
-    let mut size: usize = 0;
+    let mut end_addr: usize = 0;
 
     let mut atags = Atags::get();
     while let Some(atag) = atags.next() {
         if let Some(mem) = atag.mem() {
-            size = mem.size as usize;
+            end_addr = mem.start as usize + mem.size as usize;
             break;
         }
     }
 
-    if size == 0 {
+    if end_addr == 0 || end_addr < binary_end {
         return None;
     }
     kprintln!("binary_end: {}", binary_end);
-    Some((util::align_up(binary_end, page_size), util::align_down(size, page_size)))
+    Some((binary_end, end_addr))
 }
 
 /*
