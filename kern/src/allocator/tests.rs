@@ -46,6 +46,7 @@ mod align_util {
         assert_eq!(align_up(0xABCDAB, 1 << 8), 0xABCE00);
         assert_eq!(align_up(0xABCDAB, 1 << 12), 0xABD000);
         assert_eq!(align_up(0xABCDAB, 1 << 16), 0xAC0000);
+        assert_eq!(align_up(0xFFFFFFFFFFFF0000, 0x10000), 0xFFFFFFFFFFFF0000);
     }
 
     #[test]
@@ -67,6 +68,11 @@ mod align_util {
     #[should_panic]
     fn test_panics_4() {
         align_up(0xFFFF0000, 456);
+    }
+    #[test]
+    #[should_panic]
+    fn test_panics_5() {
+        align_up(0xFFFFFFFFFFFF0001, 0x10000);
     }
 }
 
