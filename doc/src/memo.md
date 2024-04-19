@@ -1085,7 +1085,8 @@ $ make
 
 ### ユーティリティ: `align_up`と`align_down`の実装
 
-align_utilのテストが成功
+- align_utilのテストが成功
+- align_upのオーバーフローテストを追加
 
 ```bash
 $ make test
@@ -1100,6 +1101,7 @@ test allocator::tests::align_util::test_align_down ... ok
 test allocator::tests::align_util::test_panics_2 ... ok
 test allocator::tests::align_util::test_panics_3 ... ok
 test allocator::tests::align_util::test_panics_4 ... ok
+test allocator::tests::align_util::test_panics_5 ... ok
 test allocator::tests::allocator::bin_alloc ... FAILED
 test allocator::tests::allocator::bin_alloc_2 ... FAILED
 test allocator::tests::allocator::bin_dealloc_1 ... FAILED
@@ -1115,5 +1117,9 @@ test allocator::tests::linked_list::example_2 ... ok
 test allocator::tests::linked_list::example_3 ... ok
 test allocator::tests::align_util::test_panics_1 ... ok
 ...
-test result: FAILED. 9 passed; 10 failed; 0 ignored; 0 measured; 0 filtered out
+test result: FAILED. 10 passed; 10 failed; 0 ignored; 0 measured; 0 filtered out
 ```
+
+### ユーティリティ: `memory_map`の実装
+
+![memory_mapの実行](images/panic_bin_allocator.png)
