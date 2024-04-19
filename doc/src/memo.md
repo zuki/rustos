@@ -1080,3 +1080,40 @@ $ make
 ```
 
 ![atags](images/pi_atags.png)
+
+## lab3, Phase 1, Sbphace C: Warning Up
+
+### ユーティリティ: `align_up`と`align_down`の実装
+
+align_utilのテストが成功
+
+```bash
+$ make test
+cargo test --target=x86_64-unknown-linux-gnu
+   Compiling kernel v0.1.0 (/home/vagrant/rustos/kern)
+    Finished dev [unoptimized + debuginfo] target(s) in 0.69s
+     Running target/x86_64-unknown-linux-gnu/debug/deps/kernel-f662d1658ad6b545
+
+running 19 tests
+test allocator::tests::align_util::test_align_up ... ok
+test allocator::tests::align_util::test_align_down ... ok
+test allocator::tests::align_util::test_panics_2 ... ok
+test allocator::tests::align_util::test_panics_3 ... ok
+test allocator::tests::align_util::test_panics_4 ... ok
+test allocator::tests::allocator::bin_alloc ... FAILED
+test allocator::tests::allocator::bin_alloc_2 ... FAILED
+test allocator::tests::allocator::bin_dealloc_1 ... FAILED
+test allocator::tests::allocator::bin_dealloc_2 ... FAILED
+test allocator::tests::allocator::bin_dealloc_s ... FAILED
+test allocator::tests::allocator::bin_exhausted ... FAILED
+test allocator::tests::allocator::bump_alloc ... FAILED
+test allocator::tests::allocator::bump_alloc_2 ... FAILED
+test allocator::tests::allocator::bump_dealloc_s ... FAILED
+test allocator::tests::allocator::bump_exhausted ... FAILED
+test allocator::tests::linked_list::example_1 ... ok
+test allocator::tests::linked_list::example_2 ... ok
+test allocator::tests::linked_list::example_3 ... ok
+test allocator::tests::align_util::test_panics_1 ... ok
+...
+test result: FAILED. 9 passed; 10 failed; 0 ignored; 0 measured; 0 filtered out
+```
