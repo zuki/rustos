@@ -40,25 +40,16 @@ fn kmain() -> ! {
     kprintln!("Welcome to cs3210!");
 
     let mut atags = atags::Atags::get();
-    loop {
-        match atags.next() {
-            Some(atag) => {
-                match atag.cmd() {
-                    Some(cmd) => {
-                        kprintln!("Cmd(");
-                        let mut iter = cmd.split_whitespace();
-                        loop {
-                            match iter.next() {
-                                Some(item) => kprintln!("  {}", item),
-                                None => break,
-                            }
-                        }
-                        kprintln!(")");
-                    }
-                    _ => kprintln!("{:#?}", atag),
+    while let Some(atag) = atags.next() {
+        match atag.cmd() {
+            Some(cmd) => {
+                kprintln!("Cmd(");
+                for item in cmd.split_whitespace() {
+                    kprintln!("  {}", item);
                 }
+                kprintln!(")");
             }
-            None => break,
+            _ => kprintln!("{:#?}", atag),
         }
     }
 //    shell::shell("> ");
