@@ -16,34 +16,36 @@ use crate::console::kprintln;
 use crate::mutex::Mutex;
 use pi::atags::{Atag, Atags};
 
-/// `LocalAlloc` is an analogous trait to the standard library's `GlobalAlloc`,
-/// but it takes `&mut self` in `alloc()` and `dealloc()`.
+/// `LocalAlloc`は標準ライブラリの `GlobalAlloc` に類似の
+/// トレイトであるが `alloc()` と `dealloc()` で `&mut self` を取る.
 pub trait LocalAlloc {
     unsafe fn alloc(&mut self, layout: Layout) -> *mut u8;
     unsafe fn dealloc(&mut self, ptr: *mut u8, layout: Layout);
 }
 
-/// Thread-safe (locking) wrapper around a particular memory allocator.
+/// 特定のメモリアロケータをラップするスレッドセーフな（ロッキング）
+/// ラッパー.
 pub struct Allocator(Mutex<Option<AllocatorImpl>>);
 
 impl Allocator {
-    /// Returns an uninitialized `Allocator`.
+    /// 初期化されていない `Allocator` を返す.
     ///
-    /// The allocator must be initialized by calling `initialize()` before the
-    /// first memory allocation. Failure to do will result in panics.
+    /// アロケータは最初のメモリを割り当てる前に `initialize()` を
+    /// 呼んで初期化しなければならない。これを怠るとパニックになる.
     pub const fn uninitialized() -> Self {
         Allocator(Mutex::new(None))
     }
 
-    /// Initializes the memory allocator.
-    /// The caller should assure that the method is invoked only once during the
-    /// kernel initialization.
+    /// メモリアロケータを初期化する.
+    /// callerはこのメソッドがカーネル初期化中に一度だけ
+    /// 呼び出されることを保証しなければならない。
     ///
     /// # Panics
     ///
-    /// Panics if the system's memory map could not be retrieved.
+    /// システムのメモリマップを取り出せなかった場合はパニックになる.
     pub unsafe fn initialize(&self) {
         let (start, end) = memory_map().expect("failed to find memory map");
+        kprintln!("start: {}, end: {}", start, end);
         *self.0.lock() = Some(AllocatorImpl::new(start, end));
     }
 }
@@ -70,15 +72,29 @@ extern "C" {
     static __text_end: u8;
 }
 
-/// Returns the (start address, end address) of the available memory on this
-/// system if it can be determined. If it cannot, `None` is returned.
+/// 決定可能であればこのシステムで利用可能なメモリの
+/// （開始アドレス, 終了アドレス）を返す. できない場合は
+/// `None` を返す.
 ///
-/// This function is expected to return `Some` under all normal cirumstances.
+/// 通常の状態であればこの関数は`Some`を返すことが期待される。
 pub fn memory_map() -> Option<(usize, usize)> {
     let page_size = 1 << 12;
     let binary_end = unsafe { (&__text_end as *const u8) as usize };
+    let mut size: usize = 0;
 
-    unimplemented!("memory map")
+    let mut atags = Atags::get();
+    while let Some(atag) = atags.next() {
+        if let Some(mem) = atag.mem() {
+            size = mem.size as usize;
+            break;
+        }
+    }
+
+    if size == 0 {
+        return None;
+    }
+    kprintln!("binary_end: {}", binary_end);
+    Some((util::align_up(binary_end, page_size), util::align_down(size, page_size)))
 }
 
 /*
