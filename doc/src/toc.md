@@ -2,6 +2,7 @@
 
 ## 課題
 
+- [Tools](lab/tools.md)
 - [Lab 0: Rustlings](lab/lab0.md)
 - [Lab 1: Raspberry Piを動かす](lab/lab1.md)
 - [Lab 2: Shellとブートローダ](lab/lab2.md)
