@@ -1134,3 +1134,54 @@ test result: FAILED. 10 passed; 10 failed; 0 ignored; 0 measured; 0 filtered out
 (2) page_sizeを無視した場合
 
 ![memory_mapの実行](images/panic_bin_allocator_2.png)
+
+## サブフェーズD: バンプアロケータの実装
+
+### ユニットテスト
+
+```bash
+$ make test
+cargo test --target=x86_64-unknown-linux-gnu
+   Compiling kernel v0.1.0 (/home/vagrant/rustos/kern)
+... # 警告メッセージ
+    Finished dev [unoptimized + debuginfo] target(s) in 1.46s
+     Running target/x86_64-unknown-linux-gnu/debug/deps/kernel-f662d1658ad6b545
+
+running 20 tests
+test allocator::tests::align_util::test_align_up ... ok
+test allocator::tests::align_util::test_align_down ... ok
+test allocator::tests::align_util::test_panics_2 ... ok
+test allocator::tests::align_util::test_panics_3 ... ok
+test allocator::tests::align_util::test_panics_4 ... ok
+test allocator::tests::align_util::test_panics_5 ... ok
+test allocator::tests::allocator::bin_alloc ... FAILED
+test allocator::tests::allocator::bin_alloc_2 ... FAILED
+test allocator::tests::allocator::bin_dealloc_1 ... FAILED
+test allocator::tests::allocator::bin_dealloc_2 ... FAILED
+test allocator::tests::allocator::bin_dealloc_s ... FAILED
+test allocator::tests::allocator::bin_exhausted ... FAILED
+test allocator::tests::allocator::bump_alloc ... ok
+test allocator::tests::align_util::test_panics_1 ... ok
+test allocator::tests::allocator::bump_dealloc_s ... ok
+test allocator::tests::allocator::bump_alloc_2 ... ok
+test allocator::tests::linked_list::example_1 ... ok
+test allocator::tests::linked_list::example_2 ... ok
+test allocator::tests::linked_list::example_3 ... ok
+test allocator::tests::allocator::bump_exhausted ... ok
+
+failures:
+    allocator::tests::allocator::bin_alloc
+    allocator::tests::allocator::bin_alloc_2
+    allocator::tests::allocator::bin_dealloc_1
+    allocator::tests::allocator::bin_dealloc_2
+    allocator::tests::allocator::bin_dealloc_s
+    allocator::tests::allocator::bin_exhausted
+
+test result: FAILED. 14 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out
+```
+
+### 実行テスト
+
+- `for`文は30回に変更
+
+![実行](images/bump_allocator.png)
