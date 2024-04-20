@@ -4,7 +4,7 @@ mod util;
 mod bin;
 mod bump;
 
-type AllocatorImpl = bin::Allocator;
+type AllocatorImpl = bump::Allocator;
 
 #[cfg(test)]
 mod tests;
@@ -45,7 +45,7 @@ impl Allocator {
     /// システムのメモリマップを取り出せなかった場合はパニックになる.
     pub unsafe fn initialize(&self) {
         let (start, end) = memory_map().expect("failed to find memory map");
-        kprintln!("start: {}, end: {}", start, end);
+        //kprintln!("start: {}, end: {}", start, end);
         *self.0.lock() = Some(AllocatorImpl::new(start, end));
     }
 }
@@ -93,11 +93,11 @@ pub fn memory_map() -> Option<(usize, usize)> {
     if end_addr == 0 || end_addr < binary_end {
         return None;
     }
-    kprintln!("binary_end: {}", binary_end);
+    //kprintln!("binary_end: {}", binary_end);
     Some((binary_end, end_addr))
 }
 
-/*
+
 impl fmt::Debug for Allocator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0.lock().as_mut() {
@@ -107,4 +107,3 @@ impl fmt::Debug for Allocator {
         Ok(())
     }
 }
-*/

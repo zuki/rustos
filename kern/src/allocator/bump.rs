@@ -4,7 +4,8 @@ use core::ptr;
 use crate::allocator::util::*;
 use crate::allocator::LocalAlloc;
 
-/// A "bump" allocator: allocates memory by bumping a pointer; never frees.
+/// "バンプ"アロケータ: ポインタを動かすことでメモリを割り当てる。
+/// 開放はしない。
 #[derive(Debug)]
 pub struct Allocator {
     current: usize,
@@ -12,53 +13,67 @@ pub struct Allocator {
 }
 
 impl Allocator {
-    /// Creates a new bump allocator that will allocate memory from the region
-    /// starting at address `start` and ending at address `end`.
+    /// アドレス `start` から始まりアドレス `end` で終わる領域から
+    /// メモリを割り当てる新しいバンプアロケータを作成する。
     #[allow(dead_code)]
     pub fn new(start: usize, end: usize) -> Allocator {
-        unimplemented!("bump allocator")
+        Allocator {
+            current: start,
+            end
+        }
     }
 }
 
 impl LocalAlloc for Allocator {
-    /// Allocates memory. Returns a pointer meeting the size and alignment
-    /// properties of `layout.size()` and `layout.align()`.
+    /// メモリを割り当てる。`layout.size()`と`layout.align()`の
+    /// プロパティを満たすポインタを返す。
     ///
-    /// If this method returns an `Ok(addr)`, `addr` will be non-null address
-    /// pointing to a block of storage suitable for holding an instance of
-    /// `layout`. In particular, the block will be at least `layout.size()`
-    /// bytes large and will be aligned to `layout.align()`. The returned block
-    /// of storage may or may not have its contents initialized or zeroed.
+    /// このメソッドが`Ok(addr)`を返す場合、`addr`は`layout`の
+    /// インスタンスを保持するのに適したストレージのブロックを
+    /// 指す非NULのアドレスとなる。特に、このブロックは少なくとも
+    /// `layout.size()`バイトの大きさであり、`layout.align()`に
+    /// アラインメントされている。返されたストレージのブロックは
+    /// その内容が初期化またはゼロ詰めになっていても、いなくてもよい。
     ///
     /// # Safety
     ///
-    /// The _caller_ must ensure that `layout.size() > 0` and that
-    /// `layout.align()` is a power of two. Parameters not meeting these
-    /// conditions may result in undefined behavior.
+    /// _caller_ は`layout.size() > 0`と`layout.align()`が2のべき乗で
+    /// あることを保証しなければならない。これらの条件を満たさない
+    /// パラメータは未定義の動作を引き起こす可能性がある。
     ///
     /// # Errors
     ///
-    /// Returning null pointer (`core::ptr::null_mut`)
-    /// indicates that either memory is exhausted
-    /// or `layout` does not meet this allocator's
-    /// size or alignment constraints.
+    /// ヌルポインタ (`core::ptr::null_mut`) が返された場合はメモリを
+    /// 使い果たしたか、 `layout`がこのアロケータのサイズまたは
+    /// アラインメントの制約を満たしていないことを示す。
     unsafe fn alloc(&mut self, layout: Layout) -> *mut u8 {
-        unimplemented!("bump allocator")
+        if layout.size() == 0 || layout.align().count_ones() != 1 {
+            return core::ptr::null_mut() as *mut u8;
+        }
+
+        let addr_start = align_up(self.current, layout.align());
+        let addr_end = addr_start.saturating_add(layout.size());
+        if self.end <= addr_start || self.end < addr_end {
+            return core::ptr::null_mut() as *mut u8;
+        }
+
+        self.current = addr_end;
+        addr_start as *mut u8
     }
 
-    /// Deallocates the memory referenced by `ptr`.
+    /// `ptr`で参照されるメモリの割当を解除する.
     ///
     /// # Safety
     ///
-    /// The _caller_ must ensure the following:
+    /// _caller_は以下を保証しなければならない:
     ///
-    ///   * `ptr` must denote a block of memory currently allocated via this
-    ///     allocator
-    ///   * `layout` must properly represent the original layout used in the
-    ///     allocation call that returned `ptr`
+    ///   * `ptr`はアロケータ経由で現在割り当てられているメモリブロックを
+    ///     示していなければならない。
+    ///   * `layout`は`ptr`を返した割り当てコールに使用した元の
+    ///     レイアウトを正しく表していなければならない。
     ///
-    /// Parameters not meeting these conditions may result in undefined
-    /// behavior.
+    /// これらの制約を満たしていないパラメタは未定義の結果になる
+    /// 可能性がある。
     unsafe fn dealloc(&mut self, _ptr: *mut u8, _layout: Layout) {
         // LEAKED
     }

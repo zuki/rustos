@@ -24,6 +24,7 @@ use console::{CONSOLE, kprint, kprintln};
 
 use allocator::Allocator;
 use fs::FileSystem;
+use alloc::vec::Vec;
 
 #[cfg_attr(not(test), global_allocator)]
 pub static ALLOCATOR: Allocator = Allocator::uninitialized();
@@ -37,7 +38,12 @@ fn kmain() -> ! {
 
     kprintln!("Welcome to cs3210!");
 
-    let hi = alloc::string::String::from("Hi!");
+    let mut v = Vec::new();
+    for i in 0..30 {
+        v.push(i);
+        kprintln!("{:?}", v);
+    }
+
 /*
     let mut atags = atags::Atags::get();
     while let Some(atag) = atags.next() {
