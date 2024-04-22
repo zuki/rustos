@@ -2,17 +2,18 @@
 
 use core::{fmt, ptr};
 
-/// An _instrusive_ linked list of addresses.
+/// アドレスの _侵入型_ リンクリスト.
 ///
-/// A `LinkedList` maintains a list of `*mut usize`s. The user of the
-/// `LinkedList` guarantees that the passed in pointer refers to valid, unique,
-/// writeable memory at least `usize` in size.
+/// `LinkedList` は `*mut usize` のリストを保持する。`LinkedList` の
+/// ユーザは渡されたポインタが有効で、ユニークで、少なくとも `usize`
+/// サイズの書き込み可能なメモリを指していることを保証する。
 ///
-/// # Usage
+/// # 使い方
 ///
-/// A list is created using `LinkedList::new()`. A new address can be prepended
-/// using `push()`. The first address in the list, if any, can be removed and
-/// returned using `pop()` or returned (but not removed) using `peek()`.
+/// リストは`LinkedList::new()`を使って作成する。新しいアドレスは
+/// `push()` を使って先頭に追加することができる。リストの先頭のアドレスは、
+/// もしあれば、 `pop()` を使って削除して返すか、 `peek()` を使って
+/// （削除せずに）返すことができる。
 ///
 /// ```rust
 /// # let address_1 = (&mut (1 as usize)) as *mut usize;
@@ -29,11 +30,11 @@ use core::{fmt, ptr};
 /// assert_eq!(list.pop(), None);
 /// ```
 ///
-/// `LinkedList` exposes two iterators. The first, obtained via `iter()`,
-/// iterates over all of the addresses in the list. The second, returned from
-/// `iter_mut()`, returns `Node`s that refer to each address in the list. The
-/// `value()` and `pop()` methods of `Node` can be used to read the value or pop
-/// the value from the list, respectively.
+/// `LinkedList` は2つのイテレータを公開している。1つは `iter()` により
+/// 得られるものでリスト内のすべてのアドレスをイテレートする。もう1つは
+/// `iter_mut()` で返されるものでリスト内の各アドレスを参照する `Node` を
+/// 返す。`Node` の `value()` メソッドと `pop()` メソッドを使って各々
+/// リストから値を読み取ったり、 値をポップしたりすることができる。
 ///
 /// ```rust
 /// # let address_1 = (&mut (1 as usize)) as *mut usize;
@@ -64,40 +65,40 @@ pub struct LinkedList {
 unsafe impl Send for LinkedList {}
 
 impl LinkedList {
-    /// Returns a new, empty linked list.
+    /// 新しい空のインクリストを返す.
     pub const fn new() -> LinkedList {
         LinkedList {
             head: ptr::null_mut(),
         }
     }
 
-    /// Returns `true` if the list is empty and `false` otherwise.
+    /// リストが空の場合は `true` 、それ以外は `false` を返す.
     pub fn is_empty(&self) -> bool {
         self.head.is_null()
     }
 
-    /// Pushes the address `item` to the front of the list.
+    /// アドレス `item` をリストの先頭にプッシュする.
     ///
-    /// # Safety
+    /// # 安全性
     ///
-    /// The caller must ensure that `item` refers to unique, writeable memory at
-    /// least `usize` in size that is valid as long as `item` resides in `self`.
-    /// Barring the uniqueness constraint, this is equivalent to ensuring that
-    /// `*item = some_usize` is a safe operation as long as the pointer resides
-    /// in `self`.
+    /// 呼び出し元は `item` が `self` に存在する限り有効な、少なくとも
+    /// `usize` サイズの一意で書き込み可能なメモリを参照していることを
+    /// 保証しなければならない。一意性の制約を除けば、これはポインタが
+    /// `self` に存在する限り `*item = some_usize` が安全な操作である
+    /// ことを保証することと等価である。
     pub unsafe fn push(&mut self, item: *mut usize) {
         *item = self.head as usize;
         self.head = item;
     }
 
-    /// Removes and returns the first item in the list, if any.
+    /// もしあればリストの先頭のアイテムを削除して返す.
     pub fn pop(&mut self) -> Option<*mut usize> {
         let value = self.peek()?;
         self.head = unsafe { *value as *mut usize };
         Some(value)
     }
 
-    /// Returns the first item in the list without removing it, if any.
+    /// もしあればリストの先頭のアイテムを削除せずに返す.
     pub fn peek(&self) -> Option<*mut usize> {
         match self.is_empty() {
             true => None,
@@ -105,7 +106,7 @@ impl LinkedList {
         }
     }
 
-    /// Returns an iterator over the items in this list.
+    /// このリストのアイテムを走査するイテレータを返す.
     pub fn iter(&self) -> Iter {
         Iter {
             current: self.head,
@@ -113,10 +114,10 @@ impl LinkedList {
         }
     }
 
-    /// Returns an iterator over the items in this list.
+    /// このリストのアイテムを走査するイテレータを返す.
     ///
-    /// The items returned from the iterator (of type `Node`) allows the given
-    /// item to be removed from the linked list via the `Node::pop()` method.
+    /// イテレータから返されるアイテム（`Node`型）は `Node::pop()`
+    /// メソッドによってリンクリストから削除することができる。
     pub fn iter_mut(&mut self) -> IterMut {
         IterMut {
             prev: &mut self.head as *mut *mut usize as *mut usize,
@@ -132,7 +133,7 @@ impl fmt::Debug for LinkedList {
     }
 }
 
-/// An iterator over the items of the linked list.
+/// リンクリストのアイテムを走査するイテレータ.
 pub struct Iter<'a> {
     _list: &'a LinkedList,
     current: *mut usize,
@@ -149,15 +150,14 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-/// An item returned from a mutable iterator of a `LinkedList`.
+/// `LinkedList` の可変イテレータから返されるアイテム.
 pub struct Node {
     prev: *mut usize,
     value: *mut usize,
 }
 
 impl Node {
-    /// Removes and returns the value of this item from the linked list it
-    /// belongs to.
+    /// このアイレムを所属するリンクリストから削除して返す.
     pub fn pop(self) -> *mut usize {
         unsafe {
             *(self.prev) = *(self.value);
@@ -165,13 +165,13 @@ impl Node {
         self.value
     }
 
-    /// Returns the value of this element.
+    /// この要素の値を返す.
     pub fn value(&self) -> *mut usize {
         self.value
     }
 }
 
-/// An iterator over the items of the linked list allowing mutability.
+/// 可変を許すリンクリストのアイテムを走査するイテレータ.
 pub struct IterMut<'a> {
     _list: &'a mut LinkedList,
     prev: *mut usize,
