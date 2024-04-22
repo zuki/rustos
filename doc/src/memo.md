@@ -1185,3 +1185,43 @@ test result: FAILED. 14 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out
 - `for`文は30回に変更
 
 ![実行](images/bump_allocator.png)
+
+## サブフェーズE: ビンアロケータの実装
+
+1. レイアウトのサイズとアライメントの大きい方で使用するbinを決定する
+2. メモリは必要になった段階で(start, end)からbumpしてbinのエントリとする
+3. 小さなbin1の後に大きなbin2を取るとアライメントの関係で無駄なスペースが
+   できるのでそのスペースをbin2より小さなbinのエントリに使用する
+
+```bash
+$ make test
+cargo test --target=x86_64-unknown-linux-gnu
+   Compiling kernel v0.1.0 (/home/vagrant/rustos/kern)
+... # 警告メッセージ
+    Finished dev [unoptimized + debuginfo] target(s) in 0.68s
+     Running target/x86_64-unknown-linux-gnu/debug/deps/kernel-f662d1658ad6b545
+
+running 20 tests
+test allocator::tests::align_util::test_align_down ... ok
+test allocator::tests::align_util::test_align_up ... ok
+test allocator::tests::align_util::test_panics_1 ... ok
+test allocator::tests::align_util::test_panics_2 ... ok
+test allocator::tests::align_util::test_panics_4 ... ok
+test allocator::tests::align_util::test_panics_3 ... ok
+test allocator::tests::align_util::test_panics_5 ... ok
+test allocator::tests::allocator::bin_alloc ... ok
+test allocator::tests::allocator::bin_dealloc_1 ... ok
+test allocator::tests::allocator::bin_dealloc_2 ... ok
+test allocator::tests::allocator::bin_alloc_2 ... ok
+test allocator::tests::allocator::bin_dealloc_s ... ok
+test allocator::tests::allocator::bin_exhausted ... ok
+test allocator::tests::allocator::bump_alloc ... ok
+test allocator::tests::allocator::bump_dealloc_s ... ok
+test allocator::tests::allocator::bump_exhausted ... ok
+test allocator::tests::linked_list::example_1 ... ok
+test allocator::tests::linked_list::example_2 ... ok
+test allocator::tests::linked_list::example_3 ... ok
+test allocator::tests::allocator::bump_alloc_2 ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+```
