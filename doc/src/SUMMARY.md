@@ -14,6 +14,7 @@
 ## 資料
 
 - [X-Modemフィル転送プロトコルを理解する](xmodem.md)
+- [FAT構造体](lab/fat-structs.md)
 
 ## 作業メモ
 
