@@ -1225,3 +1225,107 @@ test allocator::tests::allocator::bump_alloc_2 ... ok
 
 test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
+
+## FAT32実装: 1, 2の実装
+
+### 依存クレートでエラー
+
+```bash
+$ cargo test -Z minimal-versions -- --nocapture
+    Updating crates.io index
+  Downloaded autocfg v0.1.4
+  Downloaded const-random v0.1.11
+  Downloaded rand v0.4.1
+  Downloaded const-random-macro v0.1.11
+  Downloaded proc-macro-hack v0.5.14
+  Downloaded getrandom v0.2.0
+  Downloaded libc v0.2.64
+  Downloaded cfg-if v0.1.2
+   Compiling libc v0.2.64
+   Compiling getrandom v0.2.0
+   Compiling semver v0.1.20
+   Compiling cfg-if v0.1.2
+   Compiling proc-macro-hack v0.5.14
+   Compiling autocfg v0.1.4
+   Compiling cfg-if v1.0.0
+   Compiling rustc_version v0.1.7
+   Compiling hashbrown v0.6.3
+   Compiling core_io v0.1.20190701
+   Compiling rand v0.4.1
+   Compiling const-random-macro v0.1.11
+error[E0432]: unresolved import `proc_macro`
+ --> /home/vagrant/.cargo/registry/src/github.com-1ecc6299db9ec823/const-random-macro-0.1.11/src/lib.rs:2:5
+  |
+2 | use proc_macro::*;
+  |     ^^^^^^^^^^ use of undeclared type or module `proc_macro`
+
+error[E0433]: failed to resolve: use of undeclared type or module `TokenTree`
+  --> /home/vagrant/.cargo/registry/src/github.com-1ecc6299db9ec823/const-random-macro-0.1.11/src/lib.rs:17:5
+   |
+17 |     TokenTree::from(Ident::new(ident, Span::call_site())).into()
+   |     ^^^^^^^^^ use of undeclared type or module `TokenTree
+...
+```
+- 以下の修正でエラー回避
+
+```bash
+$ vi ~/.cargo/registry/src/github.com-1ecc6299db9ec823/const-random-macro-0.1.11/src/lib.rs
+extern crate proc_macro;   # 先頭にこの行を追加
+```
+
+### E0133 warningが多発
+
+```bash
+warning: borrow of packed field is unsafe and requires unsafe function or block (error E0133)
+  --> src/mbr.rs:63:61
+   |
+63 |             .field("relative_sector", &format_args!("{:?}", self.relative_sector))
+   |                                                             ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: #[warn(safe_packed_borrows)] on by default
+   = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+   = note: for more information, see issue #46043 <https://github.com/rust-lang/rust/issues/46043>
+   = note: fields of packed structs might be misaligned: dereferencing a misaligned pointer or even just creating a misaligned reference is undefined behavior
+```
+
+- これはpacked構造体でアライメントに合わないフィールドに対して発生する
+- 以下のようにエラー対象となったフィールドを`{}`で囲むと回避できる
+
+```rust
+.field("relative_sector", &format_args!("{:?}", { self.relative_sector }))
+```
+
+### ユニットテスト成功
+
+```bash
+$ cargo test -Z minimal-versions -- --nocapture
+Compiling const-random-macro v0.1.11
+   Compiling const-random v0.1.11
+   Compiling ahash v0.2.19
+   Compiling hashbrown v0.6.3
+   Compiling fat32 v0.1.0 (/home/vagrant/rustos/lib/fat32)
+
+   Finished dev [unoptimized + debuginfo] target(s) in 0.93s
+     Running target/debug/deps/fat32-daad72bc5314dd73
+
+running 16 tests
+test tests::check_ebpb_signature ... ok
+test tests::check_mbr_boot_indicator ... ok
+test tests::check_mbr_size ... ok
+test tests::check_mbr_signature ... ok
+test tests::test_ebpb ... ok
+test tests::test_mbr ... ok
+
+failures:
+    tests::check_entry_sizes
+    tests::shuffle_test
+    tests::test_all_dir_entries
+    tests::test_mock1_files_recursive
+    tests::test_mock2_files_recursive
+    tests::test_mock3_files_recursive
+    tests::test_mock4_files_recursive
+    tests::test_root_entries
+    tests::test_vfat_init
+
+test result: FAILED. 7 passed; 9 failed; 0 ignored; 0 measured; 0 filtered out
+```
