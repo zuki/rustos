@@ -2,7 +2,7 @@ use shim::io;
 
 use crate::traits::{Dir, Entry, File, Metadata, Timestamp};
 
-/// A type that implements all of the file system traits.
+/// ファイルシステムトレイトのすべてを実装する型.
 #[derive(Copy, Clone)]
 pub struct Dummy;
 
@@ -36,13 +36,13 @@ impl File for Dummy {
     }
 }
 
-/// Trait implemented by directories in a file system.
+/// ファイルシステムのディレクトリにより実装されるトレイト.
 impl Dir for Dummy {
-    /// The type of entry stored in this directory.
+    /// このディレクトリに格納されるエントリの型.
     type Entry = Dummy;
     type Iter = Dummy;
 
-    /// Returns an interator over the entries in this directory.
+    /// このディレクトリのすべてのエントリを走査するイテレータを返す.
     fn entries(&self) -> io::Result<Self::Iter> {
         panic!("Dummy")
     }

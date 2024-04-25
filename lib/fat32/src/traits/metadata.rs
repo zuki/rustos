@@ -1,45 +1,45 @@
-/// Trait for a timestamp (year, month, day, hour, minute, second).
+/// タイムスタンプ（年、月、日、時、分、秒）用のトレイト.
 pub trait Timestamp: Copy + Clone + Sized {
-    /// The calendar year.
+    /// カレンダー年.
     ///
-    /// The year is not offset. 2009 is 2009.
+    /// 年はオフセットではない。2009は2009である。
     fn year(&self) -> usize;
 
-    /// The calendar month, starting at 1 for January. Always in range [1, 12].
+    /// カレンダー月、1月の1から始まる。常に range [1, 12] にある。
     ///
-    /// January is 1, Feburary is 2, ..., December is 12.
+    /// 1月は1, 2月は2, ..., 12月は12.
     fn month(&self) -> u8;
 
-    /// The calendar day, starting at 1. Always in range [1, 31].
+    /// カレンダー日。1から始まる。常に range [1, 31] にある。
     fn day(&self) -> u8;
 
-    /// The 24-hour hour. Always in range [0, 24).
+    /// 24時間の時。常に range [0, 24] にある。
     fn hour(&self) -> u8;
 
-    /// The minute. Always in range [0, 60).
+    /// 分。常に range [0, 60] にある。
     fn minute(&self) -> u8;
 
-    /// The second. Always in range [0, 60).
+    /// 秒。常に range [0, 60) にある。
     fn second(&self) -> u8;
 }
 
-/// Trait for directory entry metadata.
+/// ディレクトリエントリメタデータ用のトレイト.
 pub trait Metadata: Sized {
-    /// Type corresponding to a point in time.
+    /// ある時点に買王する型.
     type Timestamp: Timestamp;
 
-    /// Whether the associated entry is read only.
+    /// 関連エントリが読み込み専用か否か.
     fn read_only(&self) -> bool;
 
-    /// Whether the entry should be "hidden" from directory traversals.
+    /// エントリをディレクトリ走査から「隠す」べきか否か.
     fn hidden(&self) -> bool;
 
-    /// The timestamp when the entry was created.
+    /// エントリが作成されたときのタイムスタンプ.
     fn created(&self) -> Self::Timestamp;
 
-    /// The timestamp for the entry's last access.
+    /// エントリが最後にアクセスされたときのタイムスタンプ.
     fn accessed(&self) -> Self::Timestamp;
 
-    /// The timestamp for the entry's last modification.
+    /// エントリが最後に変更されたときのタイムスタンプ.
     fn modified(&self) -> Self::Timestamp;
 }

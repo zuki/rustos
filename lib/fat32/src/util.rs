@@ -3,54 +3,54 @@ use core::mem::{align_of, forget, size_of};
 use core::slice::{from_raw_parts, from_raw_parts_mut};
 
 pub trait VecExt {
-    /// Casts a `Vec<T>` into a `Vec<U>`.
+    /// `Vec<T>` を `Vec<U>` にキャストする.
     ///
-    /// # Safety
+    /// # 安全性
     ///
-    /// The caller must ensure the following safety properties:
+    /// callerは次の安全性プロパティを保証しなけらばならない:
     ///
-    ///   * The vector `self` contains valid elements of type `U`. In
-    ///     particular, note that `drop` will never be called for `T`s in `self`
-    ///     and instead will be called for the `U`'s in `self`.
-    ///   * The size and alignment of `T` and `U` are identical.
+    ///   * ベクタ `self` は型 `U` の有効な要素を含んでいる。特に、
+    ///     `dorp` は `self` の `T` に対しては決して呼び出されず、
+    ///     `self` の `U` 対して呼び出されることに注意すること。
+    ///   * `T` と `U` のサイズとアライメントは同じである。
     ///
-    /// # Panics
+    /// # パニック
     ///
-    /// Panics if the size or alignment of `T` and `U` differ.
+    /// `T` と `U` のサイズまたはアライメントが異なる場合はパニックになる。
     unsafe fn cast<U>(self) -> Vec<U>;
 }
 
 pub trait SliceExt {
-    /// Casts an `&[T]` into an `&[U]`.
+    /// `&[T]` を `&[U]` にキャストする.
     ///
-    /// # Safety
+    /// # 安全性
     ///
-    /// The caller must ensure the following safety properties:
+    /// callerは次の安全性プロパティを保証しなけらばならない:
     ///
-    ///   * The slice `self` contains valid elements of type `U`.
-    ///   * The size of `T` and `U` are identical.
-    ///   * The alignment of `T` is an integer multiple of the alignment of `U`.
+    ///   * スライス `self` は型 `U の有効な要素を含んでいる。
+    ///   * `T` と `U` のサイズは同じである。
+    ///   * `T` のアライメントは `U` のアライメントの整数倍である。
     ///
-    /// # Panics
+    /// # パニック
     ///
-    /// Panics if the size of `T` and `U` differ or if the alignment of `T` is
-    /// not an integer multiple of `U`.
+    /// `T` と `U` のサイズが異なる、または、`T` のアライメントが
+    /// `U` のアライメントの整数倍でない場合はパニックにある。
     unsafe fn cast<'a, U>(&'a self) -> &'a [U];
 
-    /// Casts an `&mut [T]` into an `&mut [U]`.
+    /// `&mut [T]` を `&mut [U]` にキャストする.
     ///
-    /// # Safety
+    /// # 安全性
     ///
-    /// The caller must ensure the following safety properties:
+    /// callerは次の安全性プロパティを保証しなけらばならない:
     ///
-    ///   * The slice `self` contains valid elements of type `U`.
-    ///   * The size of `T` and `U` are identical.
-    ///   * The alignment of `T` is an integer multiple of the alignment of `U`.
+    ///   * スライス `self` は型 `U の有効な要素を含んでいる。
+    ///   * `T` と `U` のサイズは同じである。
+    ///   * `T` のアライメントは `U` のアライメントの整数倍である。
     ///
-    /// # Panics
+    /// # パニック
     ///
-    /// Panics if the size of `T` and `U` differ or if the alignment of `T` is
-    /// not an integer multiple of `U`.
+    /// `T` と `U` のサイズが異なる、または、`T` のアライメントが
+    /// `U` のアライメントの整数倍でない場合はパニックにある。
     unsafe fn cast_mut<'a, U>(&'a mut self) -> &'a mut [U];
 }
 

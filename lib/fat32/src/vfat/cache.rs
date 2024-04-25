@@ -13,11 +13,11 @@ struct CacheEntry {
 }
 
 pub struct Partition {
-    /// The physical sector where the partition begins.
+    /// このパーティションが始まる物理セクタ.
     pub start: u64,
-    /// Number of sectors
+    /// セクタ数
     pub num_sectors: u64,
-    /// The size, in bytes, of a logical sector in the partition.
+    /// パーティションの論理セクタのバイト単位のサイズ.
     pub sector_size: u64,
 }
 
@@ -28,22 +28,23 @@ pub struct CachedPartition {
 }
 
 impl CachedPartition {
-    /// Creates a new `CachedPartition` that transparently caches sectors from
-    /// `device` and maps physical sectors to logical sectors inside of
-    /// `partition`. All reads and writes from `CacheDevice` are performed on
-    /// in-memory caches.
+    /// `device` からセクタを透過的にキャッシュし、物理セクタを
+    /// `partition` 内の論理セクタにマップする新しい `CachedPartition` を
+    /// 作成する。`CacheDevice` からの読み込みと書き出しはすべて
+    /// インメモリキャッシュで行われる。
     ///
-    /// The `partition` parameter determines the size of a logical sector and
-    /// where logical sectors begin. An access to a sector `0` will be
-    /// translated to physical sector `partition.start`. Virtual sectors of
-    /// sector number `[0, num_sectors)` are accessible.
+    /// `partition` パラメータは論理セクタのサイズと論理セクタの開始位置を
+    /// 決定する。セクタ番号 `0` へのアクセスは物理セクタ `partition.start`
+    /// に変換される。セクタ番号 `[0, num_sectors)` の仮想セクタは
+    /// アクセス可能である。
     ///
-    /// `partition.sector_size` must be an integer multiple of
-    /// `device.sector_size()`.
+    /// `partition.sector_size` は `device.sector_size()` の整数倍で
+    /// なければならない。
     ///
-    /// # Panics
+    /// # パニック
     ///
-    /// Panics if the partition's sector size is < the device's sector size.
+    /// パーティションのセクタサイズがデバイスのセクタサイズより小さい
+    /// 場合はパニックになる。
     pub fn new<T>(device: T, partition: Partition) -> CachedPartition
     where
         T: BlockDevice + 'static,
@@ -57,14 +58,13 @@ impl CachedPartition {
         }
     }
 
-    /// Returns the number of physical sectors that corresponds to
-    /// one logical sector.
+    /// 論理セクタあたりの物理セクタ数を返すr.
     fn factor(&self) -> u64 {
         self.partition.sector_size / self.device.sector_size()
     }
 
-    /// Maps a user's request for a sector `virt` to the physical sector.
-    /// Returns `None` if the virtual sector number is out of range.
+    /// ユーザからのセクタ `virt` に対する要求を物理セクタにマップする。
+    /// 仮想セクタ番号が範囲外の場合は `Nnone` を返す。
     fn virtual_to_physical(&self, virt: u64) -> Option<u64> {
         if virt >= self.partition.num_sectors {
             return None;
@@ -76,26 +76,30 @@ impl CachedPartition {
         Some(physical_sector)
     }
 
-    /// Returns a mutable reference to the cached sector `sector`. If the sector
-    /// is not already cached, the sector is first read from the disk.
+    /// キャッシュされたセクタ `sector` への可変参照を返す。
+    /// そのセクタがまだキャッシュされていない場合はまずディスクから
+    /// そのセクタが読み込まれる。
     ///
-    /// The sector is marked dirty as a result of calling this method as it is
-    /// presumed that the sector will be written to. If this is not intended,
-    /// use `get()` instead.
+    /// このメソッドを呼び出すとそのセクタはダーティとみなされる。
+    /// セクタに書き込まれることが前提となっているからである。これを
+    /// 意図しない場合は `get()` を使用すること。
     ///
-    /// # Errors
+    /// # エラー
     ///
-    /// Returns an error if there is an error reading the sector from the disk.
+    /// セクタをディスクから読み込む際にエラーが発生死た場合はエラーを
+    /// 返す。
     pub fn get_mut(&mut self, sector: u64) -> io::Result<&mut [u8]> {
         unimplemented!("CachedPartition::get_mut()")
     }
 
-    /// Returns a reference to the cached sector `sector`. If the sector is not
-    /// already cached, the sector is first read from the disk.
+    /// キャッシュされたセクタ `sector` への参照を返す。そのセクタが
+    /// まだキャッシュされていない場合はまずディスクからそのセクタが
+    /// 読み込まれる。
     ///
-    /// # Errors
+    /// # エラー
     ///
-    /// Returns an error if there is an error reading the sector from the disk.
+    /// セクタをディスクから読み込む際にエラーが発生死た場合はエラーを
+    /// 返す。
     pub fn get(&mut self, sector: u64) -> io::Result<&[u8]> {
         unimplemented!("CachedPartition::get()")
     }

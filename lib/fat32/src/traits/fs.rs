@@ -2,112 +2,119 @@ use shim::{io, path::Path};
 
 use crate::traits::Metadata;
 
-/// Trait implemented by files in the file system.
+/// ファイルシステムのファイルにより実装されるトレイト.
 pub trait File: io::Read + io::Write + io::Seek + Sized {
-    /// Writes any buffered data to disk.
+    /// バッファされているデータをディスクに書き出す.
     fn sync(&mut self) -> io::Result<()>;
 
-    /// Returns the size of the file in bytes.
+    /// ファイルのバイト単位のサイズを返す.
     fn size(&self) -> u64;
 }
 
-/// Trait implemented by directories in a file system.
+/// ファイルシステムのディレクトリにより実装されるトレイト.
 pub trait Dir: Sized {
-    /// The type of entry stored in this directory.
+    /// このディレクトリに格納されるエントリの型.
     type Entry: Entry;
 
-    /// An type that is an iterator over the entries in this directory.
+    /// このディレクトリのエントリを走査するイテレータの型.
     type Iter: Iterator<Item = Self::Entry>;
 
-    /// Returns an interator over the entries in this directory.
+    /// このディレクトリのエントリを走査するイテレータを返す.
     fn entries(&self) -> io::Result<Self::Iter>;
 }
 
-/// Trait implemented by directory entries in a file system.
+/// ファイルシステムのディレクトリエントリにより実装されるトレイト.
 ///
-/// An entry is either a `File` or a `Directory` and is associated with both
-/// `Metadata` and a name.
+/// エンドリは `File` か `Directory` のいずれかであり、`Metadata` と
+/// 名前に関連付けられる。
 pub trait Entry: Sized {
     type File: File;
     type Dir: Dir;
     type Metadata: Metadata;
 
-    /// The name of the file or directory corresponding to this entry.
+    /// このエントリに対応するファイルまたはディレクトリの名前.
     fn name(&self) -> &str;
 
-    /// The metadata associated with the entry.
+    /// このエントリに関連付けられたメタデータ.
     fn metadata(&self) -> &Self::Metadata;
 
-    /// If `self` is a file, returns `Some` of a reference to the file.
-    /// Otherwise returns `None`.
+    /// `self` がファイルの場合はファイルへの参照の `Some` を返す。
+    /// それでなければ `None` を返す。
     fn as_file(&self) -> Option<&Self::File>;
 
-    /// If `self` is a directory, returns `Some` of a reference to the
-    /// directory. Otherwise returns `None`.
+    /// `self` がディレクトリの場合はディレクトリへの参照の `Some` を返す。
+    /// それでなければ `None` を返す。
     fn as_dir(&self) -> Option<&Self::Dir>;
 
-    /// If `self` is a file, returns `Some` of the file. Otherwise returns
-    /// `None`.
+    /// `self` がファイルの場合はファイルの `Some` を返す。
+    /// それでなければ `None` を返す。
     fn into_file(self) -> Option<Self::File>;
 
-    /// If `self` is a directory, returns `Some` of the directory. Otherwise
-    /// returns `None`.
+    /// `self` がディレクトリの場合はディレクトリの `Some` を返す。
+    /// それでなければ `None` を返す。
     fn into_dir(self) -> Option<Self::Dir>;
 
-    /// Returns `true` if this entry is a file or `false` otherwise.
+    /// このエントリがファイルの場合は `true` を返す。そうでなければ
+    /// `false` を返す。
     fn is_file(&self) -> bool {
         self.as_file().is_some()
     }
 
-    /// Returns `true` if this entry is a directory or `false` otherwise.
+    /// このエントリがディレクトリの場合は `true` を返す。そうでなければ
+    /// `false` を返す。
     fn is_dir(&self) -> bool {
         self.as_dir().is_some()
     }
 }
 
-/// Trait implemented by file systems.
+/// ファイルシステムにより実装されるトレイト.
 pub trait FileSystem: Sized {
-    /// The type of files in this file system.
+    /// このファイルシステムのファイルの型.
     type File: File;
 
-    /// The type of directories in this file system.
+    /// このファイルシステムのディレクトリの型.
     type Dir: Dir<Entry = Self::Entry>;
 
-    /// The type of directory entries in this file system.
+    /// このファイルシステムのディレクトリエントリの型.
     type Entry: Entry<File = Self::File, Dir = Self::Dir>;
 
-    /// Opens the entry at `path`. `path` must be absolute.
+    /// `path` にあるエントリをオープンする. `path` は絶対パスで
+    /// なければならない。
     ///
-    /// # Errors
+    /// # エラー
     ///
-    /// If `path` is not absolute, an error kind of `InvalidInput` is returned.
+    /// If `path` が絶対パスでない場合、`InvalidInput` という種類の
+    /// エラーが返される。
     ///
-    /// If any component but the last in `path` does not refer to an existing
-    /// directory, an error kind of `InvalidInput` is returned.
+    /// `path` の最後のコンポーネント以外が既存のディレクトリを参照して
+    /// いない場合、 `InvalidInput` という種類のエラーが返される。
     ///
-    /// If there is no entry at `path`, an error kind of `NotFound` is returned.
+    /// `path` にエントリがない場合、`NotFound` という種類のエラーが
+    /// 返される。
     ///
-    /// All other error values are implementation defined.
+    /// それ以外のエラー値はすべて実装定義である。
     fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry>;
 
-    /// Opens the file at `path`. `path` must be absolute.
+    /// `path` にあるファイルをオープンする. `path` は絶対パスで
+    /// なければならない。
     ///
-    /// # Errors
+    /// # エラー
     ///
-    /// In addition to the error conditions for `open()`, this method returns an
-    /// error kind of `Other` if the entry at `path` is not a regular file.
+    /// `open()` のエラー条件に加え, この関数は `path` にあるエントリが
+    /// 通常ファイルでない場合、`Other` という種類のエラーが返される。
     fn open_file<P: AsRef<Path>>(self, path: P) -> io::Result<Self::File> {
         self.open(path)?
             .into_file()
             .ok_or(io::Error::new(io::ErrorKind::Other, "not a regular file"))
     }
 
-    /// Opens the directory at `path`. `path` must be absolute.
+    /// `path` にあるディレクトリをオープンする. `path` は絶対パスで
+    /// なければならない。
     ///
-    /// # Errors
+    /// # エラー
     ///
-    /// In addition to the error conditions for `open()`, this method returns an
-    /// error kind of `Other` if the entry at `path` is not a directory.
+    /// `open()` のエラー条件に加え, この関数は `path` にあるエントリが
+    /// ディレクトリでない場合、`Other` という種類のエラーが返される。
     fn open_dir<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Dir> {
         self.open(path)?
             .into_dir()
