@@ -1329,3 +1329,25 @@ failures:
 
 test result: FAILED. 7 passed; 9 failed; 0 ignored; 0 measured; 0 filtered out
 ```
+
+## FAT32実装: 3, 4の実装
+
+```bash
+$ cargo test -Z minimal-versions
+   Compiling fat32 v0.1.0 (/home/vagrant/rustos/lib/fat32)
+    Finished dev [unoptimized + debuginfo] target(s) in 1.45s
+     Running target/debug/deps/fat32-daad72bc5314dd73
+
+running 16 tests
+test tests::check_ebpb_signature ... ok
+test tests::check_ebpb_size ... ok
+test tests::check_mbr_boot_indicator ... ok
+test tests::check_mbr_signature ... ok
+test tests::check_mbr_size ... ok
+test tests::shuffle_test ... FAILED
+test tests::test_mbr ... ok
+test tests::test_ebpb ... ok
+test tests::test_mock4_files_recursive ... FAILED
+test tests::test_vfat_init ... ok                     # <= これが新たにOK
+
+test result: FAILED. 8 passed; 8 failed; 0 ignored; 0 measured; 0 filtered out
