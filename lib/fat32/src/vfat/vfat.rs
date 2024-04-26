@@ -16,7 +16,7 @@ use crate::util::SliceExt;
 use crate::vfat::{BiosParameterBlock, CachedPartition, Partition};
 use crate::vfat::{Cluster, Dir, Entry, Error, FatEntry, File, Status};
 
-/// A generic trait that handles a critical section as a closure
+/// クロージャとしてクリティカルセクションを処理するジェネリックトレイト
 pub trait VFatHandle: Clone + Debug + Send + Sync {
     fn new(val: VFat<Self>) -> Self;
     fn lock<R>(&self, f: impl FnOnce(&mut VFat<Self>) -> R) -> R;
@@ -39,33 +39,49 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
     where
         T: BlockDevice + 'static,
     {
-        unimplemented!("VFat::from()")
+        let mbr = MasterBootRecord::from(&mut device)?;
+        for partition in mbr.partitions.iter() {
+            if partition.partition_type == 0xB || partition.partition_type == 0xC {
+                let bpb = BiosParameterBlock::from(&mut device, partition.relative_sector as u64)?;
+                return Ok(HANDLE::new(VFat {
+                    phantom: PhantomData {},
+                    device: CachedPartition::new(device, Partition {
+                        start: partition.relative_sector as u64,
+                        num_sectors: partition.total_sectores as u64,
+                        sector_size: bpb.bytes_per_sector as u64,
+                    }),
+                    bytes_per_sector: bpb.bytes_per_sector,
+                    sectors_per_cluster: bpb.sectors_per_cluster,
+                    sectors_per_fat: bpb.sectors_per_fat(),
+                    fat_start_sector: bpb.reserved_sectors as u64,
+                    data_start_sector: (bpb.reserved_sectors as u64)
+                        + (bpb.fat_count as u64 * bpb.sectors_per_fat() as u64),
+                    rootdir_cluster: Cluster::from(bpb.root_cluster),
+                }));
+            }
+        }
+        Err(Error::NotFound)
     }
 
-    // TODO: The following methods may be useful here:
+    // TODO: ここでは次のメソッドが役に立つだろう:
     //
-    //  * A method to read from an offset of a cluster into a buffer.
+    // クラスタのオフセットからバッファに読み込む.
+    //fn read_cluster(&mut self, cluster: Cluster,
+    //                 offset: usize, buf: &mut [u8]) -> io::Result<usize> {
+    //}
     //
-    //    fn read_cluster(
-    //        &mut self,
-    //        cluster: Cluster,
-    //        offset: usize,
-    //        buf: &mut [u8]
-    //    ) -> io::Result<usize>;
+    // 開始クラスタのからクラスタチェーンをすべてベクタに読み込む
+    //fn read_chain(&mut self, start: Cluster, buf: &mut Vec<u8>)
+    //    -> io::Result<usize> {
     //
-    //  * A method to read all of the clusters chained from a starting cluster
-    //    into a vector.
+    //}
     //
-    //    fn read_chain(
-    //        &mut self,
-    //        start: Cluster,
-    //        buf: &mut Vec<u8>
-    //    ) -> io::Result<usize>;
+    // クラスタの `FatEntry` への参照を返す.
+    // この参照は直接キャッシュされたセクタを指している.
+    //fn fat_entry(&mut self, cluster: Cluster) -> io::Result<&FatEntry> {
     //
-    //  * A method to return a reference to a `FatEntry` for a cluster where the
-    //    reference points directly into a cached sector.
-    //
-    //    fn fat_entry(&mut self, cluster: Cluster) -> io::Result<&FatEntry>;
+    //}
+
 }
 
 impl<'a, HANDLE: VFatHandle> FileSystem for &'a HANDLE {
