@@ -1006,7 +1006,7 @@ FAT32パーティションのBPBとEBPBの読み込みと解析を行います�
 
 #### ファイルシステム
 
-`vfat/vfat.rs`ファイルにはファイルシステムそのものである`VFat`構造が
+`vfat/vfat.rs`ファイルにはファイルシステムそのものである`VFat`構造体が
 含まれています。この構造体には`CachedPartition`が含まれていることに
 注意してください。あなたの実装では提供された`BlockDevice`を
 `CachedPartition`でラップする必要があります。
@@ -1176,7 +1176,7 @@ FAT32パーティションのBPBとEBPBの読み込みと解析を行います�
    println!("{:?}", x);
    ```
 
-4. `vfat/cache.rs`にある`CachedPartition`を実装る
+4. `vfat/cache.rs`にある`CachedPartition`を実装する
 
 5. `vfat/vfat.rs`にある`VFat::from()`を実装する
 
