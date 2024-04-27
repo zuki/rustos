@@ -60,8 +60,8 @@ impl fmt::Debug for PartitionEntry {
             .field("start", &format_args!("{:?}", self.start))
             .field("partition_type", &format_args!("{:?}", self.partition_type))
             .field("end", &format_args!("{:?}", self.end))
-            .field("relative_sector", &format_args!("{:?}", { self.relative_sector }))
-            .field("total_sectores", &format_args!("{:?}", { self.total_sectores }))
+            .field("relative_sector", &{ self.relative_sector })
+            .field("total_sectores", &{ self.total_sectores })
             .finish()
     }
 }

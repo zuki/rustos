@@ -1289,10 +1289,10 @@ warning: borrow of packed field is unsafe and requires unsafe function or block 
 ```
 
 - これはpacked構造体でアライメントに合わないフィールドに対して発生する
-- 以下のようにエラー対象となったフィールドを`{}`で囲むと回避できる
+- 以下のようにエラー対象となったフィールドを`&{}`で囲むと回避できる（講義資料で指摘されていた）
 
 ```rust
-.field("relative_sector", &format_args!("{:?}", { self.relative_sector }))
+.field("relative_sector", &{ self.relative_sector })
 ```
 
 ### ユニットテスト成功
