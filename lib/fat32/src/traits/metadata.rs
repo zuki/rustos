@@ -25,7 +25,7 @@ pub trait Timestamp: Copy + Clone + Sized {
 
 /// ディレクトリエントリメタデータ用のトレイト.
 pub trait Metadata: Sized {
-    /// ある時点に買王する型.
+    /// ある時点に対応する型.
     type Timestamp: Timestamp;
 
     /// 関連エントリが読み込み専用か否か.

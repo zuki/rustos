@@ -25,7 +25,7 @@ pub trait Dir: Sized {
 
 /// ファイルシステムのディレクトリエントリにより実装されるトレイト.
 ///
-/// エンドリは `File` か `Directory` のいずれかであり、`Metadata` と
+/// エントリは `File` か `Directory` のいずれかであり、`Metadata` と
 /// 名前に関連付けられる。
 pub trait Entry: Sized {
     type File: File;
