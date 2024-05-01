@@ -1295,7 +1295,7 @@ warning: borrow of packed field is unsafe and requires unsafe function or block 
 .field("relative_sector", &{ self.relative_sector })
 ```
 
-### ユニットテスト成功
+### 実装3: ユニットテスト成功
 
 ```bash
 $ cargo test -Z minimal-versions -- --nocapture
@@ -1330,7 +1330,7 @@ failures:
 test result: FAILED. 7 passed; 9 failed; 0 ignored; 0 measured; 0 filtered out
 ```
 
-## FAT32実装: 3, 4の実装
+## FAT32実装: 4, 5の実装
 
 ```bash
 $ cargo test -Z minimal-versions
@@ -1351,3 +1351,381 @@ test tests::test_mock4_files_recursive ... FAILED
 test tests::test_vfat_init ... ok                     # <= これが新たにOK
 
 test result: FAILED. 8 passed; 8 failed; 0 ignored; 0 measured; 0 filtered out
+```
+
+## FAT32実装: 6-11の実装
+
+- 新しいテストはすべて失敗
+- test_mock3_files_recursiveでスタックオーバーフロー
+
+```bash
+running 16 tests
+test tests::check_ebpb_size ... ok
+test tests::check_ebpb_signature ... ok
+test tests::check_entry_sizes ... FAILED
+test tests::check_mbr_boot_indicator ... ok
+test tests::check_mbr_size ... ok
+test tests::check_mbr_signature ... ok
+test tests::test_all_dir_entries ... FAILED
+test tests::test_ebpb ... ok
+test tests::shuffle_test ... FAILED
+test tests::test_mbr ... ok
+test tests::test_mock1_files_recursive ... FAILED
+
+
+thread 'tests::test_mock3_files_recursive' has overflowed its stack
+fatal runtime error: stack overflow
+error: process didn't exit successfully: `/home/vagrant/rustos/lib/fat32/target/debug/deps/fat32-daad72bc5314dd73` (signal: 6, SIGABRT: process abort signal)
+```
+
+## extディレクトリの内容
+
+```bash
+$ parted mock1.fat32.img unit B print
+WARNING: You are not superuser.  Watch out for permissions.
+Model:  (file)
+Disk /home/vagrant/rustos/ext/fat32-imgs/mock1.fat32.img: 201326592B
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags:
+
+Number  Start  End         Size        Type     File system  Flags
+ 1      512B   201326591B  201326080B  primary  fat32        boot
+
+$ parted mock2.fat32.img unit B print
+WARNING: You are not superuser.  Watch out for permissions.
+Model:  (file)
+Disk /home/vagrant/rustos/ext/fat32-imgs/mock2.fat32.img: 201326592B
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags:
+
+Number  Start     End         Size        Type     File system  Flags
+ 1      8388608B  201326591B  192937984B  primary  fat32
+
+$ parted mock3.fat32.img unit B print
+WARNING: You are not superuser.  Watch out for permissions.
+Model:  (file)
+Disk /home/vagrant/rustos/ext/fat32-imgs/mock3.fat32.img: 201326592B
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags:
+
+Number  Start     End         Size        Type     File system  Flags
+ 1      8388608B  201326591B  192937984B  primary  fat32
+
+$ parted mock4.fat32.img unit B print
+WARNING: You are not superuser.  Watch out for permissions.
+Model:  (file)
+Disk /home/vagrant/rustos/ext/fat32-imgs/mock4.fat32.img: 201326592B
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags:
+
+Number  Start     End         Size        Type     File system  Flags
+ 1      8388608B  201326591B  192937984B  primary  fat32
+```
+
+### 中身は同じ
+
+```bash
+$ sudo mount -o loop,offset=8388608,sizelimit=192937984 mock3.fat32.img /mnt
+vagrant@ubuntu-bionic:~/rustos/ext/fat32-imgs$ tree /mnt
+/mnt
+├── notes
+│   ├── lec1
+│   │   └── slides.pdf
+│   ├── lec2
+│   │   ├── code
+│   │   │   ├── code.pdf
+│   │   │   └── code.rs
+│   │   └── paper.pdf
+│   ├── lec3
+│   │   └── cheat-sheet.pdf
+│   ├── lec4
+│   │   └── uart-basics.pdf
+│   ├── lec5
+│   │   ├── fs-dm.pdf
+│   │   └── fs-engler.pdf
+│   └── lec7
+│       └── fat-structs.pdf
+├── rpi3-docs
+│   ├── ARM
+│   │   ├── ARM-Cortex-A53-Manual.pdf
+│   │   ├── ARMv8-A-Programmer-Guide.pdf
+│   │   ├── ARMv8-Reference-Manual.pdf
+│   │   └── ISA-Cheat-Sheet.pdf
+│   ├── Broadcom
+│   │   ├── BCM2835-ARM-Peripherals.pdf
+│   │   ├── BCM2836-ARM-Local-Peripherals.pdf
+│   │   └── BCM2837-ARM-Peripherals.pdf
+│   ├── EMMC
+│   │   ├── Physical-Layer-Simplified-SpecificationV6.0.pdf
+│   │   └── SD-Host-Controller-Simplified-SpecificationV4.20.pdf
+│   └── RPi3-Schematics.pdf
+└── solutions
+    ├── 0-blinky
+    │   ├── c
+    │   │   └── blinky.c
+    │   └── rust
+    │       └── blinky.rs
+    └── 1-shell
+        └── ferris-wheel
+            ├── compile-fail
+            │   └── answers
+            ├── compile-pass
+            │   └── answers
+            └── questions
+                └── answers
+
+21 directories, 24 files
+
+$ sudo umount /mnt
+```
+
+## 個別にテスト
+
+### `check_entry_sizes()`
+
+```bash
+$ cargo test -Z minimal-versions check_entry_sizes
+running 1 test
+test tests::check_entry_sizes ... FAILED
+
+failures:
+
+---- tests::check_entry_sizes stdout ----
+thread 'tests::check_entry_sizes' panicked at 'assertion failed: `(left == right)`
+  left: `42`,
+ right: `32`: 'vfat::dir::VFatUnknownDirEntry' does not have the expected size of 32', src/tests.rs:171:5
+```
+
+- VFatUnknownDirEntryの定義ミスだった
+
+```bash
+running 1 test
+test tests::check_entry_sizes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out
+```
+
+### `test_root_entries()`
+
+```bash
+cargo test -Z minimal-versions test_root_entries
+
+running 1 test
+test tests::test_root_entries ... FAILED
+
+failures:
+
+---- tests::test_root_entries stdout ----
+
+File system hash failed for mock 1 root directory!
+
+--------------- EXPECTED ---------------
+-f--	00/00/1980 00:00:00 02/26/2018 00:25:20 00/00/1980 00:00:00 	CS140E
+d---	02/26/2018 00:25:20 02/26/2018 00:25:20 02/26/2018 00:00:00 	NOTES
+d---	02/26/2018 00:25:20 02/26/2018 00:25:20 02/26/2018 00:00:00 	rpi3-docs
+d---	02/26/2018 00:25:20 02/26/2018 00:25:20 02/26/2018 00:00:00 	solutions
+---------------- ACTUAL ----------------
+-f--	00/00/1980 00:00:00 02/26/2056 00:25:10 00/00/1980 00:00:00 	CS140E.CS140E
+d---	02/26/2056 00:25:10 02/26/2056 00:25:10 02/26/2056 00:00:00 	NOTES.NOTES
+d---	02/26/2056 00:25:10 02/26/2056 00:25:10 02/26/2056 00:00:00 	rpi3-docs
+d---	02/26/2056 00:25:10 02/26/2056 00:25:10 02/26/2056 00:00:00 	solutions
+---------------- END ----------------
+thread 'tests::test_root_entries' panicked at 'hash mismatch', src/tests.rs:246:5
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace.
+
+
+failures:
+    tests::test_root_entries
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out
+```
+
+- metadata.rsとdir.rsにバグあり
+
+```bash
+running 1 test
+test tests::test_root_entries ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out
+```
+
+### `test_all_dir_entries()`
+
+- mock3のみエラー
+
+```bash
+$ diff -uw expected.txt actual.txt
+--- expected.txt	2024-04-30 16:03:32.000000000 +0900
++++ actual.txt	2024-04-30 16:03:52.000000000 +0900
+@@ -16,40 +16,40 @@
+ /NOTES/LEC1
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	.
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	..
+--f--	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	SLIDES.PDF
++-f--	02/26/2018 00:40:00 02/26/2018 00:40:00 04/29/2024 00:00:00 	SLIDES.PDF
+
+ /NOTES/LEC2
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	.
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	..
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	CODE
+--f--	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	PAPER.PDF
++-f--	02/26/2018 00:40:00 02/26/2018 00:40:00 04/29/2024 00:00:00 	PAPER.PDF
+
+ /NOTES/LEC2/CODE
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	.
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	..
+--f--	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	CODE.PDF
+--f--	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	CODE.RS
++-f--	02/26/2018 00:40:00 02/26/2018 00:40:00 04/29/2024 00:00:00 	CODE.PDF
++-f--	02/26/2018 00:40:00 02/26/2018 00:40:00 04/29/2024 00:00:00 	CODE.RS
+
+ /NOTES/LEC3
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	.
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	..
+--f--	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	cheat-sheet.pdf
++-f--	02/26/2018 00:40:00 02/26/2018 00:40:00 04/29/2024 00:00:00 	cheat-sheet.pdf
+
+ /NOTES/LEC4
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	.
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	..
+--f--	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	uart-basics.pdf
++-f--	02/26/2018 00:40:00 02/26/2018 00:40:00 04/29/2024 00:00:00 	uart-basics.pdf
+
+ /NOTES/LEC5
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	.
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	..
+--f--	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	FS-DM.PDF
+--f--	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	fs-engler.pdf
++-f--	02/26/2018 00:40:00 02/26/2018 00:40:00 04/29/2024 00:00:00 	FS-DM.PDF
++-f--	02/26/2018 00:40:00 02/26/2018 00:40:00 04/29/2024 00:00:00 	fs-engler.pdf
+
+ /NOTES/LEC7
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	.
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	..
+--f--	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	fat-structs.pdf
++-f--	02/26/2018 00:40:00 02/26/2018 00:40:00 04/29/2024 00:00:00 	fat-structs.pdf
+
+ /rpi3-docs
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	.
+@@ -122,7 +122,7 @@
+ /solutions/1-SHELL/ferris-wheel/compile-pass
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	.
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	..
+--f--	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	ANSWERS
++-f--	02/26/2018 00:40:00 02/26/2018 00:40:00 04/29/2024 00:00:00 	ANSWERS
+
+ /solutions/1-SHELL/ferris-wheel/questions
+ d---	02/26/2018 00:40:00 02/26/2018 00:40:00 02/26/2018 00:00:00 	.
+```
+
+```bash
+$ cd /mnt
+$ ls -al notes/lec1
+total 903
+drwxr-xr-x 2 root root    512 Feb 26  2018 .
+drwxr-xr-x 8 root root    512 Feb 26  2018 ..
+-rwxr-xr-x 1 root root 923375 Feb 26  2018 slides.pdf
+$ ls -al notes/lec2
+total 209
+drwxr-xr-x 3 root root    512 Feb 26  2018 .
+drwxr-xr-x 8 root root    512 Feb 26  2018 ..
+drwxr-xr-x 2 root root    512 Feb 26  2018 code
+-rwxr-xr-x 1 root root 211518 Feb 26  2018 paper.pdf
+```
+
+- 解凍後にmock3.fat32.imgを更新してしまったようだ
+- 一旦削除して再解凍したファイルに対してテストしたら問題なかった
+
+```bash
+running 1 test
+test tests::test_all_dir_entries ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out
+```
+
+## `test_mock1_files_recursive()`
+
+```bash
+$ cargo test -Z minimal-versions test_mock1_files_recursive
+    Finished dev [unoptimized + debuginfo] target(s) in 0.02s
+     Running target/debug/deps/fat32-daad72bc5314dd73
+
+running 1 test
+test tests::test_mock1_files_recursive ... FAILED
+
+failures:
+
+---- tests::test_mock1_files_recursive stdout ----
+thread 'tests::test_mock1_files_recursive' panicked at 'assertion failed: `(left == right)`
+  left: `874160`,
+ right: `923375`: expected to read 923375 bytes (file size) but read 874160', src/tests.rs:328:5
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace.
+
+   #  ls -l notes/lec1/slides.pdf
+   #  -rwxr-xr-x 1 root root 923375 Feb 26  2018 slides.pdf
+
+failures:
+    tests::test_mock1_files_recursive
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out
+```
+
+- read_cluster_unaligned()のバグだった
+
+```bash
+$ cargo test -Z minimal-versions test_mock1_files_recursive
+   Compiling fat32 v
+running 1 test
+test tests::test_mock1_files_recursive ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out
+```
+
+### `shuffle_test()`
+
+```bash
+$ cargo test -Z minimal-versions shuffle_test
+    Finished dev [unoptimized + debuginfo] target(s) in 0.02s
+     Running target/debug/deps/fat32-daad72bc5314dd73
+
+running 1 test
+test tests::shuffle_test ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out
+```
+
+## 全テストOK
+
+```bash
+$ cargo test -Z minimal-versions
+
+running 16 tests
+test tests::check_ebpb_size ... ok
+test tests::check_ebpb_signature ... ok
+test tests::check_mbr_boot_indicator ... ok
+test tests::check_mbr_signature ... ok
+test tests::check_mbr_size ... ok
+test tests::check_entry_sizes ... ok
+test tests::test_all_dir_entries ... ok
+test tests::test_ebpb ... ok
+test tests::test_mbr ... ok
+test tests::shuffle_test ... ok
+test tests::test_mock1_files_recursive ... ok
+test tests::test_mock2_files_recursive ... ok
+test tests::test_mock3_files_recursive ... ok
+test tests::test_root_entries ... ok
+test tests::test_vfat_init ... ok
+test tests::test_mock4_files_recursive ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+   Doc-tests fat32
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+```

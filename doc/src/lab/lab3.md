@@ -1199,7 +1199,7 @@ FAT32パーティションのBPBとEBPBの読み込みと解析を行います�
 
    `Date`型, `Time`型, `Attributes`型は、ディスク上のディレクトリエントリの
    フィールドに直接マップする必要があります。これらを実装する際には
-   [「FATの構造」](file:///Users/dspace/raspi_os/rustos/doc/book/lab/fat-structs.md)を
+   [「FATの構造」](fat-structs.md)を
    参照してください。`Timestamp`型と`Metadata`型には相当する構造が
    ディスク上にありませんが、ディスク上の生の構造をよりきれいに抽象化
    する役割を果たし、`Entry`, `File` `Dir`の各トレイトを実装する際に
@@ -1215,40 +1215,26 @@ FAT32パーティションのBPBとEBPBの読み込みと解析を行います�
    `entries()`メソッドからこの構造体を返すことになるでしょう。`entries()`を
    実装する際には最大でも1行の`unsafe`を使用する必要があるでしょう。
    ここで提供している`VecExt`トレイトと`SliceExt`トレイトの実装が特に
-   役に立つことがわかるでしょう。`Dir`の実装中は頻繁に[「FATの構造」](file:///Users/dspace/raspi_os/rustos/doc/book/lab/fat-structs.md)を
-   参照する必要があることに注意してください。
+   役に立つことがわかるでしょう。`Dir`の実装中は頻繁に[「FATの構造」](fat-structs.md)を参照する必要があることに注意してください。
 
    **エントリのパース**
 
-       ディスク上のエントリはLFNエントリか、通常エントリのいずれかなので
-       ディスク上のエントリを表現するには`union`を使用しなければなりません。
-       そのようなユニオンを用意しました。`VFatDirEntry`です。Rustのunionに
-       ついては[Rsutリファレンス](https://doc.rust-lang.org/reference/items/unions.html)で、
-       一般的なunionについては[Wikipediaのユニオン型](https://en.wikipedia.org/wiki/Union_type)で読むことができます。
 
-       ディレクトリエントリはまず未知のエントリと解釈し、その構造体を使って
-       エントリがあるかどうか、ある場合はエントリの本当の種類を判断し、最後に
-       その構造体としてエントリを解釈する必要があります。`union`を扱うには
-       `unsafe`を使う必要があります。控えめに使用してください。リファレンス
-       実装では、各ヴァリアントにアクセスするために1回ずつ、1行の`unsafe`を
-       3回使用ししています。
+   ディレクトリエントリの名前をパースする際には非LFNベースのディレクトリ
+   エントリにはファイルの拡張子を区切るために手動で`.`を追加する必要が
+   あります。ファイルの拡張子が空でない場合のみ`.`を追加するべきです。
+   最後に、LFNエントリをパースする際にはUTF-16文字をデコードする必要が
+   あります。それを行うには[`decode_utf16()`](https://doc.rust-lang.org/core/char/fn.decode_utf16.html)関数を
+   使用してください。長いファイル名をパースする間はUTF-16文字を1つ
+   以上の`Vec<u16>`に格納すると便利です。
 
-       ディレクトリエントリの名前をパースする際には非LFNベースのディレクトリ
-       エントリにはファイルの拡張子を区切るために手動で`.`を追加する必要が
-       あります。ファイルの拡張子が空でない場合のみ`.`を追加するべきです。
+   **`Dir::find()`**
 
-       最後に、LFNエントリをパースする際にはUTF-16文字をデコードする必要が
-       あります。それを行うには[`decode_utf16()`](https://doc.rust-lang.org/core/char/fn.decode_utf16.html)関数を
-       使用してください。長いファイル名をパースする間はUTF-16文字を1つ
-       以上の`Vec<u16>`に格納すると便利です。
-
-    **`Dir::find()`**
-
-       `Dir::find()`の実装は`Dir`用の`trait::Dir`を実装した _後に_ 行う
-       必要があります。`Dir::find()`は大文字と小文字を区別しないことに
-       注意してください。実装は比較的短くなるはずです。大文字小文字を区別
-       しない比較には[`eq_ignore_ascii_case()`](https://doc.rust-lang.org/std/primitive.str.html#method.eq_ignore_ascii_case)
-       メソッドを使用することができます。
+   `Dir::find()`の実装は`Dir`用の`trait::Dir`を実装した _後に_ 行う
+   必要があります。`Dir::find()`は大文字と小文字を区別しないことに
+   注意してください。実装は比較的短くなるはずです。大文字小文字を区別
+   しない比較には[`eq_ignore_ascii_case()`](https://doc.rust-lang.org/std/primitive.str.html#method.eq_ignore_ascii_case)
+   メソッドを使用することができます。
 
 10. `vfat/file.rs`にある`File`を実装する
 
@@ -1260,7 +1246,7 @@ FAT32パーティションのBPBとEBPBの読み込みと解析を行います�
 11. `vfat/vfat.rs`にある｀VFat::open()`を実装する
 
     最後に`VFat::open()`メソッドを実装してください。`Path`のコンポーネント
-    のいてレートには[`components()`](https://doc.rust-lang.org/std/path/struct.Path.html#method.components)
+    のイテレートには[`components()`](https://doc.rust-lang.org/std/path/struct.Path.html#method.components)
     メソッドを使用してください。`shim`ライブラリで提供している`Path`の
     実装にはファイルシステムを必要とするメソッドは含まれていないことに
     注意してください。これには`read_dir()`, `is_file()`, `is_dir()`などが
