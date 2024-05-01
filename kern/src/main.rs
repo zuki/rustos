@@ -25,6 +25,9 @@ use console::{CONSOLE, kprint, kprintln};
 use allocator::Allocator;
 use fs::FileSystem;
 use alloc::vec::Vec;
+use fs::sd::Sd;
+
+use fat32::traits::BlockDevice;
 
 #[cfg_attr(not(test), global_allocator)]
 pub static ALLOCATOR: Allocator = Allocator::uninitialized();
@@ -38,13 +41,26 @@ fn kmain() -> ! {
 
     kprintln!("Welcome to cs3210!");
 
+    match unsafe { Sd::new() } {
+        Ok(mut sd) => {
+            let mut buf = [0_u8; 512];
+            match &sd.read_sector(0, &mut buf) {
+                Ok(n) => kprintln!("read {} bytes", n),
+                Err(e) => kprintln!("error in read: {:?}", e),
+            }
+        }
+        Err(e) => kprintln!("error in new: {:?}", e),
+    }
+
+
+/*
     let mut v = Vec::new();
     for i in 0..30 {
         v.push(i);
         kprintln!("{:?}", v);
     }
 
-/*
+
     let mut atags = atags::Atags::get();
     while let Some(atag) = atags.next() {
         match atag.cmd() {
