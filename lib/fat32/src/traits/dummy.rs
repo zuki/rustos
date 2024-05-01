@@ -3,7 +3,7 @@ use shim::io;
 use crate::traits::{Dir, Entry, File, Metadata, Timestamp};
 
 /// ファイルシステムトレイトのすべてを実装する型.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Dummy;
 
 impl io::Write for Dummy {
