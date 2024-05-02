@@ -1735,3 +1735,23 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 - テスト成功
 
 ![画面](images/ffi_sd.png)
+
+# lab3: phase 3, Subphase B: ファイルシステム
+
+```rust
+use fat32::traits::fs::{Entry, File, Dir};         # これらのトレイトをuseしないと関数が未定義といわれる
+use fat32::traits::FileSystem as FAT32FileSystem;  # aliasにしないとfs::FileSystemの重複定義と言われる
+
+if let Ok(root) = FILESYSTEM.open(PathBuf::from("/")) {
+   let root = root.into_dir().unwrap();
+   for entry in root.entries().unwrap() {
+      if let Some(f) = entry.as_file() {
+            kprintln!("{}: {}", entry.name(), f.size());
+      } else {
+            kprintln!("{}", entry.name());
+      }
+   }
+}
+```
+
+![ファイルしすレム実行画面](images/fs_root_files.png)
