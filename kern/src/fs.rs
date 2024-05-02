@@ -15,11 +15,13 @@ use crate::mutex::Mutex;
 #[derive(Clone)]
 pub struct PiVFatHandle(Rc<Mutex<VFat<Self>>>);
 
-// These impls are *unsound*. We should use `Arc` instead of `Rc` to implement
-// `Sync` and `Send` trait for `PiVFatHandle`. However, `Arc` uses atomic memory
-// access, which requires MMU to be initialized on ARM architecture. Since we
-// have enabled only one core of the board, these unsound impls will not cause
-// any immediate harm for now. We will fix this in the future.
+// これらの実装は *不健全* である。`PiVFatHandle`の `Sync`
+// トレイトと `Send` トレイトの実装には `Rc` ではなく `Arc` を
+// 使うべきである。しかし、`Arc` はアトミックメモリアクセスを
+// 使用するため、ARMアーキテクチャではMMUを初期化する必要がある。
+// 私たちはボード上の1つのコアしか有効にしていないので、これらの
+// 不健全な実装は今のところ直ちに害を及ぼすことはない。いずれ
+// 修正する予定である。
 unsafe impl Send for PiVFatHandle {}
 unsafe impl Sync for PiVFatHandle {}
 
@@ -38,30 +40,45 @@ impl VFatHandle for PiVFatHandle {
         f(&mut self.0.lock())
     }
 }
+
 pub struct FileSystem(Mutex<Option<PiVFatHandle>>);
 
 impl FileSystem {
-    /// Returns an uninitialized `FileSystem`.
+    /// 初期化していない `FileSystem` を返す.
     ///
-    /// The file system must be initialized by calling `initialize()` before the
-    /// first memory allocation. Failure to do will result in panics.
+    /// 最初のメモリ割り当てを行う前に `initialize()` を呼び出して
+    /// ファイルシステムを初期化する必要がある。そうしないと
+    /// パニックを起こすことになる。
     pub const fn uninitialized() -> Self {
         FileSystem(Mutex::new(None))
     }
 
-    /// Initializes the file system.
-    /// The caller should assure that the method is invoked only once during the
-    /// kernel initialization.
+    /// ファイルシステムを粗帰化する.
     ///
-    /// # Panics
+    /// callerはカーネルの初期化の際に1度だけこのメソッドを
+    /// 実行するいつ用がある。
     ///
-    /// Panics if the underlying disk or file sytem failed to initialize.
+    /// # パニック
+    ///
+    /// ディスクまたはファイルシステムの初期化に失敗した場合は
+    /// パニックを起こす
     pub unsafe fn initialize(&self) {
-        unimplemented!("FileSystem::initialize()")
+        let sd = sd::Sd::new().expect("failed to init sd card");
+        let vfat = VFat::<PiVFatHandle>::from(sd).expect("failed to init vfat");
+
+        *self.0.lock() = Some(vfat);
     }
 }
 
 // FIXME: Implement `fat32::traits::FileSystem` for `&FileSystem`
-/*
-impl fat32::traits::FileSystem for &FileSystem {}
-*/
+
+impl fat32::traits::FileSystem for &FileSystem {
+    type File = fat32::vfat::File<PiVFatHandle>;
+    type Dir = fat32::vfat::Dir<PiVFatHandle>;
+    type Entry = fat32::vfat::Entry<PiVFatHandle>;
+
+    fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
+        //self.0.lock().as_ref().expect("kernel::fs uninitialize").open(path)
+        self.0.lock().as_ref().expect("kernel::fs uninitialized").open(path)
+    }
+}

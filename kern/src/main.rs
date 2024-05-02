@@ -26,8 +26,12 @@ use allocator::Allocator;
 use fs::FileSystem;
 use alloc::vec::Vec;
 use fs::sd::Sd;
+use shim::path::PathBuf;
 
-use fat32::traits::BlockDevice;
+use fat32::traits::FileSystem as FAT32FileSystem;
+use fat32::traits::fs::{Entry, File, Dir};
+
+//use fat32::traits::BlockDevice;
 
 #[cfg_attr(not(test), global_allocator)]
 pub static ALLOCATOR: Allocator = Allocator::uninitialized();
@@ -36,11 +40,23 @@ pub static FILESYSTEM: FileSystem = FileSystem::uninitialized();
 fn kmain() -> ! {
     unsafe {
         ALLOCATOR.initialize();
-        //FILESYSTEM.initialize();
+        FILESYSTEM.initialize();
     }
 
     kprintln!("Welcome to cs3210!");
 
+    if let Ok(root) = FILESYSTEM.open(PathBuf::from("/")) {
+        let root = root.into_dir().unwrap();
+        for entry in root.entries().unwrap() {
+            if let Some(f) = entry.as_file() {
+                kprintln!("{}: {}", entry.name(), f.size());
+            } else {
+                kprintln!("{}", entry.name());
+            }
+        }
+    }
+
+/*
     match unsafe { Sd::new() } {
         Ok(mut sd) => {
             let mut buf = [0_u8; 512];
@@ -52,8 +68,6 @@ fn kmain() -> ! {
         Err(e) => kprintln!("error in new: {:?}", e),
     }
 
-
-/*
     let mut v = Vec::new();
     for i in 0..30 {
         v.push(i);
