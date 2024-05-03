@@ -17,3 +17,5 @@
 ## 作業メモ
 
 - [メモ](memo.md)
+ [FAT32解析調査](fat32.md)
+- [Lab3終了時点のソースリスト](lab/lab3_tree.md)
