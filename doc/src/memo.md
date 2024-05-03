@@ -1754,4 +1754,14 @@ if let Ok(root) = FILESYSTEM.open(PathBuf::from("/")) {
 }
 ```
 
-![ファイルしすレム実行画面](images/fs_root_files.png)
+![ファイルシステム実行画面](images/fs_root_files.png)
+
+# lab3: phase 4: Mo'shの実装
+
+- cwd, cd, lsまで実装
+
+![cwd, cd, ls](images/sh_ls_cd_cwd.png)
+
+- catも実装
+
+![cwd, cd, ls, cat](images/sh_ls_cd_cwd_cat.png)
