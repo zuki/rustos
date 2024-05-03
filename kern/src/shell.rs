@@ -115,6 +115,39 @@ fn do_ls(cwd: &PathBuf, show_all: bool)  {
     }
 }
 
+fn do_cat(path: &PathBuf)  {
+    use io::Read;
+    use io::Write;
+
+    if let Ok(entry) = FILESYSTEM.open(canonicalize(path)) {
+        if entry.is_file() {
+            let mut buf = [0_u8; 512];
+            let mut file = entry.into_file().unwrap();
+            loop {
+                match &file.read(&mut buf) {
+                    Ok(bytes) => {
+                        if *bytes == 0_usize {
+                            break;
+                        } else {
+                            let mut console = CONSOLE.lock();
+                            console.write(&buf[0..*bytes]);
+                        }
+                    }
+                    Err(_) => {
+                        kprintln!("read error occured");
+                        break;
+                    }
+                }
+            }
+            kprintln!("");
+        } else {
+            kprintln!("{} is not file", canonicalize(path).display())
+        }
+    } else {
+        kprintln!("{} is not exist", canonicalize(path).display());
+    }
+}
+
 /// 各行のプリフィックスとして`prefix`を使ってシェルを開始する。
 /// `exit`コマンドが呼び出されたらこの関数はリターンする。
 pub fn shell(prefix: &str) -> () {
@@ -150,6 +183,17 @@ pub fn shell(prefix: &str) -> () {
                                 } else {
                                     cwd.push(command.args[1]);
                                     cwd = canonicalize(&cwd);
+                                }
+                            }
+                            &"cat" => {
+                                kprint!("\n");
+                                if command.args.len() < 2 {
+                                    kprintln!("cat requires at least one <path>");
+                                } else {
+                                    for i in 1..command.args.len() {
+                                        let path = &cwd.join(PathBuf::from(command.args[i]));
+                                        do_cat(&path);
+                                    }
                                 }
                             }
                             &"ls" => {

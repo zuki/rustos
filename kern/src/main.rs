@@ -43,6 +43,7 @@ fn kmain() -> ! {
         FILESYSTEM.initialize();
     }
 
+/*
     kprintln!("Welcome to cs3210!");
 
     if let Ok(root) = FILESYSTEM.open(PathBuf::from("/")) {
@@ -56,7 +57,6 @@ fn kmain() -> ! {
         }
     }
 
-/*
     match unsafe { Sd::new() } {
         Ok(mut sd) => {
             let mut buf = [0_u8; 512];
