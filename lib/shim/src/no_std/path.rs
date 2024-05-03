@@ -1,26 +1,27 @@
 // ignore-tidy-filelength
 
-//! Cross-platform path manipulation.
+//! クロスプラットフォームのパス操作.
 //!
-//! This module provides two types, [`PathBuf`] and [`Path`][`Path`] (akin to [`String`]
-//! and [`str`]), for working with paths abstractly. These types are thin wrappers
-//! around [`OsString`] and [`OsStr`] respectively, meaning that they work directly
-//! on strings according to the local platform's path syntax.
+//! このモジュールは抽象的にパスを操作するための2つの型 [`PathBuf`] と
+//! [`Path`][`Path`] （[`String`] と [`str`] のようなもの）を提供する。
+//! これらの型はそれぞれ [`OsString`] と [`OsStr`] の薄いラッパーであり、
+//! ローカルプラットフォームのパス構文に従う文字列を直接扱うことができる。
 //!
-//! Paths can be parsed into [`Component`]s by iterating over the structure
-//! returned by the [`components`] method on [`Path`]. [`Component`]s roughly
-//! correspond to the substrings between path separators (`/` or `\`). You can
-//! reconstruct an equivalent path from components with the [`push`] method on
-//! [`PathBuf`]; note that the paths may differ syntactically by the
-//! normalization described in the documentation for the [`components`] method.
+//! パスは [`Path`] の [`components`] メソッドが返す構造体を反復処理する
+//! ことで [`Component`] にパースすることができる。[`Component`] は大まかに
+//! 言えば、パスの区切り文字 (`/` または `\`) の間の部分文字列に対応する。
+//! コンポーネントから相当するパスを再構築するには [`PathBuf`] に対して
+//! [`push`] メソッドを使用する。[`components`] メソッドのドキュメントで
+//! 説明されている正規化によってパスの構文が変わる可能性があることに注意
+//! されたい。
 //!
-//! ## Simple usage
+//! ## 簡単な使用例
 //!
-//! Path manipulation includes both parsing components from slices and building
-//! new owned paths.
+//! Pathの操作にはスライスからコンポーネントをパースする操作と新規にpathを
+//! 構築する操作の2つがある。
 //!
-//! To parse a path, you can create a [`Path`] slice from a [`str`]
-//! slice and start asking questions:
+//! pathのパースには [`str`] スライスから [`Path`] を作成して、質問を
+//! 開始することができる。
 //!
 //! ```
 //! use std::path::Path;
@@ -38,12 +39,12 @@
 //! assert_eq!(extension, Some(OsStr::new("txt")));
 //! ```
 //!
-//! To build or modify paths, use [`PathBuf`]:
+//! pathの構築と変更には [`PathBuf`] を使用する。
 //!
 //! ```
 //! use std::path::PathBuf;
 //!
-//! // This way works...
+//! // これで動作するはず...
 //! let mut path = PathBuf::from("c:\\");
 //!
 //! path.push("windows");
@@ -51,8 +52,9 @@
 //!
 //! path.set_extension("dll");
 //!
-//! // ... but push is best used if you don't know everything up
-//! // front. If you do, this way is better:
+//! // ... しかし、Pushは事前にすべてを把握していない場合に
+//! // 使うのがベストであり、把握しているのであれば次の方法のが
+//! // 良い。
 //! let path: PathBuf = ["c:\\", "windows", "system32.dll"].iter().collect();
 //! ```
 //!
@@ -102,11 +104,10 @@ pub const MAIN_SEP: char = '/';
 // GENERAL NOTES
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Parsing in this module is done by directly transmuting OsStr to [u8] slices,
-// taking advantage of the fact that OsStr always encodes ASCII characters
-// as-is.  Eventually, this transmutation should be replaced by direct uses of
-// OsStr APIs for parsing, but it will take a while for those to become
-// available.
+// このモジュールでの解析はOsStrが常にASCII文字をそのままエンコードする
+// ことを利用して OsStr を [u8] スライスに直接変換することで行われる。
+// 最終的には、この変換は OsStr のAPIを直接使ってパースすることに取って
+// 代わられるはずであるが、それが可能になるまでにはしばらく時間がかかるだろう。
 
 ////////////////////////////////////////////////////////////////////////////////
 // Windows Prefixes
@@ -3830,7 +3831,7 @@ mod tests {
         let mut components = p.components();
 
         assert!(p.is_absolute());
-        
+
         let root = PathBuf::from("/");
         assert!(root.is_absolute());
     }
