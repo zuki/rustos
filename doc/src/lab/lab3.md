@@ -1407,6 +1407,8 @@ Rustyバインディングを使用して`kernel/src/fs.rs`にある`FileSystem`
 このフェーズではシェルコマンド`cd`, `ls`, `pwd`, `cat`を実装します。
 主に`kern/src/shell.rs`で作業します。
 
+![shell画面](shell1.gif)
+
 ### ワーキングディレクトリ
 
 _ワーキングディレクトリ_ という概念についてはすでにお馴染みだと
