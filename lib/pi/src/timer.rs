@@ -37,6 +37,13 @@ impl Timer {
                       (self.registers.CLO.read() as u64);
         Duration::from_micros(counts)
     }
+
+    /// Sets up a match in timer 1 to occur `t` duration from now. If
+    /// interrupts for timer 1 are enabled and IRQs are unmasked, then a timer
+    /// interrupt will be issued in `t` duration.
+    pub fn tick_in(&mut self, t: Duration) {
+        unimplemented!()
+    }
 }
 
 /// 現在時刻を返す.
@@ -48,4 +55,11 @@ pub fn current_time() -> Duration {
 pub fn spin_sleep(t: Duration) {
     let start = current_time();
     while current_time() < start + t {}
+}
+
+/// Sets up a match in timer 1 to occur `t` duration from now. If
+/// interrupts for timer 1 are enabled and IRQs are unmasked, then a timer
+/// interrupt will be issued in `t` duration.
+pub fn tick_in(t: Duration) {
+    unimplemented!()
 }
