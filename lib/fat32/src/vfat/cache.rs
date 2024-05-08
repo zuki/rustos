@@ -119,7 +119,7 @@ impl CachedPartition {
     ///
     /// # エラー
     ///
-    /// セクタをディスクから読み込む際にエラーが発生死た場合はエラーを
+    /// セクタをディスクから読み込む際にエラーが発生した場合はエラーを
     /// 返す。
     pub fn get_mut(&mut self, sector: u64) -> io::Result<&mut [u8]> {
         self.get_entry(sector).map(|entry| {
@@ -134,7 +134,7 @@ impl CachedPartition {
     ///
     /// # エラー
     ///
-    /// セクタをディスクから読み込む際にエラーが発生死た場合はエラーを
+    /// セクタをディスクから読み込む際にエラーが発生した場合はエラーを
     /// 返す。
     pub fn get(&mut self, sector: u64) -> io::Result<&[u8]> {
         self.get_entry(sector).map(|entry| entry.data.as_slice())
