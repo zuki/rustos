@@ -100,6 +100,9 @@ fn kmain() -> ! {
         }
     }
 */
+
+    kprintln!("current el = {}", unsafe { aarch64::current_el() });
+
     shell::shell("> ");
     loop {}
 }
