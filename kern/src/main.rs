@@ -99,9 +99,11 @@ fn kmain() -> ! {
             _ => kprintln!("{:#?}", atag),
         }
     }
-*/
 
     kprintln!("current el = {}", unsafe { aarch64::current_el() });
+*/
+
+    unsafe { aarch64::brk!(2) };
 
     shell::shell("> ");
     loop {}

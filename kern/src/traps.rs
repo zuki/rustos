@@ -9,6 +9,8 @@ use pi::interrupt::{Controller, Interrupt};
 
 use self::syndrome::Syndrome;
 use self::syscall::handle_syscall;
+use crate::console::{CONSOLE, kprint, kprintln};
+use aarch64::*;
 
 #[repr(u16)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -35,11 +37,14 @@ pub struct Info {
     kind: Kind,
 }
 
-/// This function is called when an exception occurs. The `info` parameter
-/// specifies the source and kind of exception that has occurred. The `esr` is
-/// the value of the exception syndrome register. Finally, `tf` is a pointer to
-/// the trap frame for the exception.
+/// この関数は例外が発生した際に呼び出される。引数`info`は
+/// 発生した例外のソースと種類を示す。`esr`は例外シンドローム
+/// レジスタの値である。`tr`は例外のトラップフレームへの
+/// ポインタである。
 #[no_mangle]
 pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
-    unimplemented!("handle_exception");
+    kprintln!("info: {:?}, esr: 0x{:x}", info, esr);
+    loop {
+        aarch64::nop();
+    }
 }
