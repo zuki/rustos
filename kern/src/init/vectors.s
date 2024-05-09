@@ -1,6 +1,8 @@
 .global context_save
 context_save:
     // FIXME: Save the remaining context to the stack.
+    stp x0,  x1,  [sp, #-16]!
+    stp x2,  x3,  [sp, #-16]!
     stp x18, x19, [sp, #-16]!
     stp x20, x21, [sp, #16]!
     stp x22, x23, [sp, #16]!
@@ -17,6 +19,9 @@ context_save:
 
     bl  handle_exception
 
+.global context_restore
+context_restore:
+    // FIXME: Restore the context from the stack.
     ldp xzr, lr, [sp], #16
 
     ldp x28, x29, [sp], #16
@@ -25,11 +30,8 @@ context_save:
     ldp x22, x23, [sp], #16
     ldp x20, x21, [sp], #16
     ldp x18, x19, [sp], #16
-    ret
-
-.global context_restore
-context_restore:
-    // FIXME: Restore the context from the stack.
+    ldp x2,  x3,  [sp], #16
+    ldp x0,  x1,  [sp], #16
     ret
 
 .macro HANDLER source, kind

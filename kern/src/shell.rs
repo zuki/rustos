@@ -222,7 +222,7 @@ pub fn shell(prefix: &str) -> () {
                                 }
                             }
                             &"exit" => {
-                                kprintln!("\nexit");
+                                kprintln!("\nexit shell.");
                                 return;
                             }
                             _ => kprintln!("\nunknown command: {}", path),

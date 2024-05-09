@@ -39,12 +39,21 @@ pub struct Info {
 
 /// この関数は例外が発生した際に呼び出される。引数`info`は
 /// 発生した例外のソースと種類を示す。`esr`は例外シンドローム
-/// レジスタの値である。`tr`は例外のトラップフレームへの
-/// ポインタである。
+/// レジスタの値、`tr`は例外のトラップフレームへのポインタである。
 #[no_mangle]
 pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
     kprintln!("info: {:?}, esr: 0x{:x}", info, esr);
-    loop {
-        aarch64::nop();
+    if info.kind == Kind::Synchronous {
+        let syndrome = Syndrome::from(esr);
+        match syndrome {
+            Syndrome::Brk(n) => {
+                kprintln!("Syndrome::Brk({})", n);
+                crate::shell::shell("debug > ");
+            }
+            Syndrome::Svc(n) => {
+                kprintln!("Syndrome::Svc({})", n);
+            }
+            _ => kprintln!("{:?}", syndrome),
+        }
     }
 }

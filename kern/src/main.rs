@@ -104,7 +104,9 @@ fn kmain() -> ! {
 */
 
     unsafe { aarch64::brk!(2) };
+    //unsafe { aarch64::svc!(3) };
 
-    shell::shell("> ");
-    loop {}
+    loop {
+        shell::shell("> ");
+    }
 }
