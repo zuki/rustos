@@ -1765,3 +1765,34 @@ if let Ok(root) = FILESYSTEM.open(PathBuf::from("/")) {
 - catも実装
 
 ![cwd, cd, ls, cat](images/sh_ls_cd_cwd_cat.png)
+
+# lab4: phase 1, Subphase C: 現在の例外レベル
+
+```rust
+kprintln!("current el = {}", unsafe { aarch64::current_el() });
+```
+
+- EL2になっている。
+
+![実行画面](images/current_el.png)
+
+# lab4: phase 1, Subphase C: EL1に切り替える
+
+```rust
+   ELR_EL2.set(switch_to_el1 as u64);
+   asm::eret();
+```
+
+- EL1になっている。
+
+![実行画面](images/switching_el1.png)
+
+# lab4: phase 1, Subphase D: 例外ベクタ実装
+
+- brk 2
+
+![brk 2画面](images/brk_2.png)
+
+- svc 3
+
+![svc 3画面](images/svc_3.png)
