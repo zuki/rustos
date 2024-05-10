@@ -1796,3 +1796,20 @@ kprintln!("current el = {}", unsafe { aarch64::current_el() });
 - svc 3
 
 ![svc 3画面](images/svc_3.png)
+
+# lab4: phase 1, Subphase E: 例外からの復帰の実装
+
+- QEMUによる実行
+
+![QEMUによる](images/context_swithc_qemu.png)
+
+- raspiによる実行
+
+![Raspiによる](images/context_swithc_raspi.png)
+
+はじめraspiで下のようなエラーになっていたのでQEMUで実行してみたら、
+エラーなく実行された。tf.elfの値が明らかにおかしい。
+その後、raspiで実行したところエラーなく実行された。この間、何を修正
+したのか記憶がない。
+
+![Raspiによる実行のエラー](images/context_swithc_error.png)
