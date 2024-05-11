@@ -1,11 +1,11 @@
 use core::fmt;
 use core::ops::{Add, AddAssign, BitAnd, BitOr, Sub, SubAssign};
 
-/// A virtual address.
+/// 仮想アドレス.
 #[derive(Copy, Clone, PartialEq)]
 pub struct VirtualAddr(usize);
 
-/// A physical address.
+/// 物理アドレス.
 #[derive(Copy, Clone, PartialEq)]
 pub struct PhysicalAddr(usize);
 

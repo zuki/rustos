@@ -4,22 +4,22 @@ use alloc::boxed::Box;
 
 use crate::process::Process;
 
-/// Type of a function used to determine if a process is ready to be scheduled
-/// again. The scheduler calls this function when it is the process's turn to
-/// execute. If the function returns `true`, the process is scheduled. If it
-/// returns `false`, the process is not scheduled, and this function will be
-/// called on the next time slice.
+/// プロセスが再スケジューリングの準備ができているか否かを判断するために
+/// 使用される関数の型。スケジューラはそのプロセスに実行順番が回ってきた
+/// 際にこの関数を呼び出す。この関数が `true` を返した場合、そのプロセスが
+/// スケジュールされる。`false` を返した場合、プロセスはスケジュールされず、
+/// 次のタイムスライスで再度この関数が呼ばれることになる。
 pub type EventPollFn = Box<dyn FnMut(&mut Process) -> bool + Send>;
 
-/// The scheduling state of a process.
+/// プロセスのスケジューリング状態.
 pub enum State {
-    /// The process is ready to be scheduled.
+    /// プロセスはスケジューリングされる準備ができている.
     Ready,
-    /// The process is waiting on an event to occur before it can be scheduled.
+    /// プロセスはスケジュールされる前に必要なイベントの発生を待っている.
     Waiting(EventPollFn),
-    /// The process is currently running.
+    /// プロセスは現在実行中である.
     Running,
-    /// The process is currently dead (ready to be reclaimed).
+    /// プロセスは現在死んでいる（再生可能）.
     Dead,
 }
 

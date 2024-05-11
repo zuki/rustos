@@ -9,5 +9,5 @@ pub struct TrapFrame {
     pub tpidr: u64,
     pub qn: [u128; 32],
     pub xn: [u64; 31],
-    __res1: u64,
+    pub zero: u64,
 }

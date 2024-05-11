@@ -1,3 +1,4 @@
+#![feature(new_uninit)]
 use alloc::boxed::Box;
 use shim::io;
 use shim::path::Path;
@@ -10,30 +11,37 @@ use crate::traps::TrapFrame;
 use crate::vm::*;
 use kernel_api::{OsError, OsResult};
 
-/// Type alias for the type of a process ID.
+/// プロセスID型用のType alias.
 pub type Id = u64;
 
-/// A structure that represents the complete state of a process.
+/// プロセスの全状態を表す構造体.
 #[derive(Debug)]
 pub struct Process {
-    /// The saved trap frame of a process.
+    /// 保存したプロセスのトラップフレーム.
     pub context: Box<TrapFrame>,
-    /// The memory allocation used for the process's stack.
+    /// プロセスのスタック用に使用するメモリ割り当て.
     pub stack: Stack,
-    /// The page table describing the Virtual Memory of the process
+    /// プロセスの仮想メモリを記述するページテーブル
     // pub vmap: Box<UserPageTable>,
-    /// The scheduling state of the process.
+    /// プロセスのスケジューリング状態.
     pub state: State,
 }
 
 impl Process {
-    /// Creates a new process with a zeroed `TrapFrame` (the default), a zeroed
-    /// stack of the default size, and a state of `Ready`.
+    /// ゼロ詰めの `TrapFrame` (デフォルト)、デフォルトサイズの
+    /// ゼロ詰めのスタック、`Ready` 状態を持つ新しいプロセスを作成する.
     ///
-    /// If enough memory could not be allocated to start the process, returns
-    /// `None`. Otherwise returns `Some` of the new `Process`.
+    /// プロセスを開始するのに十分なメモリを確保できなかった場合は
+    /// `OsError::NoMemory` を返す。そうでない場合は、新しい `Process`
+    /// の `Some` を返す。
     pub fn new() -> OsResult<Process> {
-        unimplemented!("Process::new()")
+        let stack = Stack::new().ok_or(OsError::NoMemory)?;
+
+        Ok(Process {
+            context: Box::new(Default::default()),
+            stack,
+            state: State::Ready,
+        })
     }
 
     /// Load a program stored in the given path by calling `do_load()` method.

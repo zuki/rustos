@@ -5,26 +5,27 @@ use core::ptr::Unique;
 use crate::vm::PhysicalAddr;
 use crate::ALLOCATOR;
 
-/// A process stack. The default size is 1MiB with an alignment of 16 bytes.
+/// プロセスのスタック. デフォルトサイズは1MiBで16バイトアライン.
 pub struct Stack {
     ptr: Unique<[u8; Stack::SIZE]>,
 }
 
 impl Stack {
-    /// The default stack size is 1MiB.
+    /// デフォルトのスタックサイズは1MiB.
     pub const SIZE: usize = 1 << 20;
 
-    /// The default stack alignment is 16 bytes.
+    /// デフォルトのスタックアライメントは16バイト.
     pub const ALIGN: usize = 16;
 
-    /// The default layout for a stack.
+    /// スタックのデフォルトレイアウト.
     fn layout() -> Layout {
         unsafe { Layout::from_size_align_unchecked(Self::SIZE, Self::ALIGN) }
     }
 
-    /// Returns a newly allocated process stack, zeroed out, if one could be
-    /// successfully allocated. If there is no memory, or memory allocation
-    /// fails for some other reason, returns `None`.
+    /// 割り当てに成功した場合は、新しく割り当てられた
+    /// プロセススタックをゼロ詰めにして返す。メモリが
+    /// ない場合や他の理由でメモリの割り当てに失敗した
+    /// 場合は `None` を返す.
     pub fn new() -> Option<Stack> {
         let raw_ptr = unsafe {
             let raw_ptr: *mut u8 = ALLOCATOR.alloc(Stack::layout());
@@ -37,17 +38,17 @@ impl Stack {
         Some(Stack { ptr })
     }
 
-    /// Internal method to cast to a `*mut u8`.
+    /// `*mut u8`にキャストするための内部メソッド.
     unsafe fn as_mut_ptr(&self) -> *mut u8 {
         self.ptr.as_ptr() as _
     }
 
-    /// Returns the physical address of top of the stack.
+    /// スタックの上端の物理アドレスを返す.
     pub fn top(&self) -> PhysicalAddr {
         unsafe { self.as_mut_ptr().add(Self::SIZE).into() }
     }
 
-    /// Returns the physical address of bottom of the stack.
+    /// スタックの底の物理アドレスを返すReturns the physical address of bottom of the stack.
     pub fn bottom(&self) -> PhysicalAddr {
         unsafe { self.as_mut_ptr().into() }
     }
