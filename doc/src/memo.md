@@ -1813,3 +1813,18 @@ kprintln!("current el = {}", unsafe { aarch64::current_el() });
 したのか記憶がない。
 
 ![Raspiによる実行のエラー](images/context_swithc_error.png)
+
+# lab4: phase 2, Subphase B: 最初のプロセスの実装
+
+1. `extern "C" fn start_shell()`を作成
+2. トラップフレームの設定
+   - tf.elf にはstart_shell()のアドレスをセット
+   - tf.spsrをセット、IRQはunset
+   - tf.spはプロセスのスタックのtop
+   - tf.trdirには最初のプロセスなので1をセット
+3. 現在のspにトラップフレームをセット
+   context_restoreを呼び出し
+   eret()の呼び出し（tr.elfにセットしたstart_shellに戻る）
+4. main.rsの`kamin()`を指定通り修正
+
+![実行画面](images/first_proc.png)
