@@ -10,18 +10,18 @@ use crate::process::{Id, Process, State};
 use crate::traps::TrapFrame;
 use crate::VMM;
 
-/// Process scheduler for the entire machine.
+/// マシン全体用のプロセススケジューラ.
 #[derive(Debug)]
 pub struct GlobalScheduler(Mutex<Option<Scheduler>>);
 
 impl GlobalScheduler {
-    /// Returns an uninitialized wrapper around a local scheduler.
+    /// 初期化していないローカルスケジューラのラッパーを返す.
     pub const fn uninitialized() -> GlobalScheduler {
         GlobalScheduler(Mutex::new(None))
     }
 
-    /// Enter a critical region and execute the provided closure with the
-    /// internal scheduler.
+    /// クリティカルリージョンに入り、内部スケジューラで指定の
+    /// クロージャを実行する.
     pub fn critical<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&mut Scheduler) -> R,
@@ -31,16 +31,17 @@ impl GlobalScheduler {
     }
 
 
-    /// Adds a process to the scheduler's queue and returns that process's ID.
-    /// For more details, see the documentation on `Scheduler::add()`.
+    /// プロセスをスケジューラのキューに追加し、そのプロセスのIDを返す
+    /// 詳細はの `Scheduler::add()` のドキュメントを参照。
     pub fn add(&self, process: Process) -> Option<Id> {
         self.critical(move |scheduler| scheduler.add(process))
     }
 
-    /// Performs a context switch using `tf` by setting the state of the current
-    /// process to `new_state`, saving `tf` into the current process, and
-    /// restoring the next process's trap frame into `tf`. For more details, see
-    /// the documentation on `Scheduler::schedule_out()` and `Scheduler::switch_to()`.
+    /// 現在のプロセスの状態を `new_state` に設定し、 `tf` を現在の
+    /// プロセスに保存し、次のプロセスのトラップフレームを `tf` に
+    /// 復元することにより `tf` を使用してコンテキストスイッチを実行する。
+    /// 詳細は `Scheduler::schedule_out()` と `Scheduler::switch_to()` の
+    /// ドキュメントを参照。
     pub fn switch(&self, new_state: State, tf: &mut TrapFrame) -> Id {
         self.critical(|scheduler| scheduler.schedule_out(new_state, tf));
         self.switch_to(tf)
@@ -56,27 +57,52 @@ impl GlobalScheduler {
         }
     }
 
-    /// Kills currently running process and returns that process's ID.
-    /// For more details, see the documentaion on `Scheduler::kill()`.
+    /// 現在実行中のプロセスをkillし、そのプロセスのIDを返す.
+    /// 詳細は `Scheduler::kill()` のドキュメントを参照。
     #[must_use]
     pub fn kill(&self, tf: &mut TrapFrame) -> Option<Id> {
         self.critical(|scheduler| scheduler.kill(tf))
     }
 
-    /// Starts executing processes in user space using timer interrupt based
-    /// preemptive scheduling. This method should not return under normal conditions.
+    /// タイマー割り込みベースのプリエンプションスケジューリングを
+    /// 使ってユーザ空間のプロセスの実行を開始する。このメソッドは
+    /// 通常の条件では復帰しない。
     pub fn start(&self) -> ! {
-        unimplemented!("GlobalScheduler::start()")
+        let process = Process::new().expect("new process");
+        let mut tf = process.context;
+        // 例外からの戻り先はstart_shell()関数
+        tf.elr = start_shell as *const u64 as u64;
+        // SPSR_EL1をセット。IRQはアンマスク
+        tf.spsr = (SPSR_EL1::M & 0b0000) | SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
+        // SP_EL0はこのプロセスのスタックのtop
+        tf.sp = process.stack.top().as_u64();
+        // 最初のプロセスなので1をセット
+        tf.tpidr = 1;
+
+        // spにトラップフレームをセットしてcontext_restore
+        unsafe {
+            asm!("mov x0, $0
+                  mov sp, x0"
+                 :: "r"(tf)
+                 :: "volatile");
+            asm!("bl context_restore" :::: "volatile");
+            asm!("adr x0, _start
+                  mov sp, x0"
+                 :::: "volatile");
+            asm!("mov x0, #0" :::: "volatile");
+        }
+        eret();
+        loop {};
     }
 
-    /// Initializes the scheduler and add userspace processes to the Scheduler
+    /// スケジューラを初期化してユーザ空間のプロセスをスケジューラに追加する.
     pub unsafe fn initialize(&self) {
         unimplemented!("GlobalScheduler::initialize()")
     }
 
-    // The following method may be useful for testing Phase 3:
+    // 次のメソッドはフェーズ3のテストに役に立つだろう。
     //
-    // * A method to load a extern function to the user process's page table.
+    // * extern関数をユーザプロセスのページテーブルにロードするメソッド.
     //
     // pub fn test_phase_3(&self, proc: &mut Process){
     //     use crate::vm::{VirtualAddr, PagePerm};
@@ -99,47 +125,49 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
-    /// Returns a new `Scheduler` with an empty queue.
+    /// からのキューを持つ新しい `Scheduler` を返す.
     fn new() -> Scheduler {
         unimplemented!("Scheduler::new()")
     }
 
-    /// Adds a process to the scheduler's queue and returns that process's ID if
-    /// a new process can be scheduled. The process ID is newly allocated for
-    /// the process and saved in its `trap_frame`. If no further processes can
-    /// be scheduled, returns `None`.
+    /// プロセスをスケジューラのキューに追加し、新しいプロセスが
+    /// スケジューリング可能であればそのプロセスのIDを返す。
+    /// プロセスIDはそのプロセスに新しく割り当てられたものであり、
+    /// `trap_frame` に保存されている。スケジュールできるプロセスが
+    /// ない場合は `None` を返す。
     ///
-    /// It is the caller's responsibility to ensure that the first time `switch`
-    /// is called, that process is executing on the CPU.
+    /// 最初の `switch` の呼び出しとそのプロセスがCPU上で実行される
+    /// ようにすることは呼び出し側の責任である。
     fn add(&mut self, mut process: Process) -> Option<Id> {
         unimplemented!("Scheduler::add()")
     }
 
-    /// Finds the currently running process, sets the current process's state
-    /// to `new_state`, prepares the context switch on `tf` by saving `tf`
-    /// into the current process, and push the current process back to the
-    /// end of `processes` queue.
+    /// 現在実行中のプロセスを見つけ、現在のプロセスの状態を `new_state` に
+    /// セットし、`tf` を現在のプロセスにセーブして `tf` によるコンテキスト
+    /// スイッチを準備し、現在のプロセスを `processes` キューの末尾に
+    /// プッシュする。
     ///
-    /// If the `processes` queue is empty or there is no current process,
-    /// returns `false`. Otherwise, returns `true`.
+    /// プロセス `processes` キューが空であるか、現在のプロセスが存在しない
+    /// 場合は `false` を返す。それ以外の場合は `true` を返す。
     fn schedule_out(&mut self, new_state: State, tf: &mut TrapFrame) -> bool {
         unimplemented!("Scheduler::schedule_out()")
     }
 
-    /// Finds the next process to switch to, brings the next process to the
-    /// front of the `processes` queue, changes the next process's state to
-    /// `Running`, and performs context switch by restoring the next process`s
-    /// trap frame into `tf`.
+    /// 次に切り替えるべきプロセスを見つけ、その次のプロセスを `processes`
+    /// キューの先頭に持ってきて、次のプロセスの状態を `Running` に変更し、
+    /// 次のプロセスのトラップフレームを `tf` に復元することでコンテキスト
+    /// スイッチを行う。
     ///
-    /// If there is no process to switch to, returns `None`. Otherwise, returns
-    /// `Some` of the next process`s process ID.
+    /// 切り替えるプロセスがない場合は `None` を返す。そうでない場合は、
+    /// 次のプロセスのプロセス IDの `Some` を返す。
     fn switch_to(&mut self, tf: &mut TrapFrame) -> Option<Id> {
         unimplemented!("Scheduler::switch_to()")
     }
 
-    /// Kills currently running process by scheduling out the current process
-    /// as `Dead` state. Removes the dead process from the queue, drop the
-    /// dead process's instance, and returns the dead process's process ID.
+    /// 現在のプロセスを `Dead` 状態としてスケジューリングから外すことで
+    /// 現在実行中のプロセスをkillする。死んだプロセスをキューから削除し、
+    /// 死んだプロセスのインスタンスをdropし、死んだプロセスのプロセスIDを
+    /// 返す。
     fn kill(&mut self, tf: &mut TrapFrame) -> Option<Id> {
         unimplemented!("Scheduler::kill()")
     }
@@ -164,3 +192,14 @@ pub extern "C" fn  test_user_process() -> ! {
     }
 }
 
+pub extern "C" fn start_shell() -> ! {
+    use crate::shell;
+
+    unsafe { asm!("brk 1" :::: "volatile"); }
+    unsafe { asm!("brk 2" :::: "volatile"); }
+    shell::shell("user0> ");
+    unsafe { asm!("brk 3" :::: "volatile"); }
+    loop {
+        shell::shell("user1> ");
+    }
+}

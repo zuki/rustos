@@ -52,61 +52,6 @@ fn kmain() -> ! {
     unsafe {
         ALLOCATOR.initialize();
         FILESYSTEM.initialize();
-    }
-
-/*
-    kprintln!("Welcome to cs3210!");
-
-    if let Ok(root) = FILESYSTEM.open(PathBuf::from("/")) {
-        let root = root.into_dir().unwrap();
-        for entry in root.entries().unwrap() {
-            if let Some(f) = entry.as_file() {
-                kprintln!("{}: {}", entry.name(), f.size());
-            } else {
-                kprintln!("{}", entry.name());
-            }
-        }
-    }
-
-    match unsafe { Sd::new() } {
-        Ok(mut sd) => {
-            let mut buf = [0_u8; 512];
-            match &sd.read_sector(0, &mut buf) {
-                Ok(n) => kprintln!("read {} bytes", n),
-                Err(e) => kprintln!("error in read: {:?}", e),
-            }
-        }
-        Err(e) => kprintln!("error in new: {:?}", e),
-    }
-
-    let mut v = Vec::new();
-    for i in 0..30 {
-        v.push(i);
-        kprintln!("{:?}", v);
-    }
-
-
-    let mut atags = atags::Atags::get();
-    while let Some(atag) = atags.next() {
-        match atag.cmd() {
-            Some(cmd) => {
-                kprintln!("Cmd(");
-                for item in cmd.split_whitespace() {
-                    kprintln!("  {}", item);
-                }
-                kprintln!(")");
-            }
-            _ => kprintln!("{:#?}", atag),
-        }
-    }
-
-    kprintln!("current el = {}", unsafe { aarch64::current_el() });
-*/
-
-    unsafe { aarch64::brk!(2) };
-    //unsafe { aarch64::svc!(3) };
-
-    loop {
-        shell::shell("> ");
+        SCHEDULER.start()
     }
 }
