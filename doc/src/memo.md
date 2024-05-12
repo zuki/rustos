@@ -1828,3 +1828,13 @@ kprintln!("current el = {}", unsafe { aarch64::current_el() });
 4. main.rsの`kamin()`を指定通り修正
 
 ![実行画面](images/first_proc.png)
+
+# lab4: phase 2, Subphase C: タイマー割り込み
+
+- Brk割り込み処理中はIRQは保留になる（画面はraspiで実行）
+
+![タイマー割り込み1](images/timer_int_1.png)
+
+- Brk割り込みを削除すると最初からIRQ割り込みが処理される（画面はQEMUで実行）
+
+![タイマー割り込み2](images/timer_int_2.png)
