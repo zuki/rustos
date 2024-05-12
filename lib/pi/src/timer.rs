@@ -6,6 +6,10 @@ use volatile::{ReadVolatile, Volatile};
 
 /// ARMシステムタイマーレジスタの基底アドレス.
 const TIMER_REG_BASE: usize = IO_BASE + 0x3000;
+/// タイマー周波数: 1MHz
+const TIMER_FREQ: u64 = 1_000_000;
+/// タイマー周期（ナノ秒単位）
+const TICK_NANOS: u64 = 1_000_000_000 / TIMER_FREQ;
 
 #[repr(C)]
 #[allow(non_snake_case)]
@@ -38,11 +42,15 @@ impl Timer {
         Duration::from_micros(counts)
     }
 
-    /// Sets up a match in timer 1 to occur `t` duration from now. If
-    /// interrupts for timer 1 are enabled and IRQs are unmasked, then a timer
-    /// interrupt will be issued in `t` duration.
+    /// 現在から `t` 時間後にタイマー1のマッチが発生するように設定する。
+    /// タイマー1の割り込みが有効かつIRQがアンマスクの場合、`t` 時間後に
+    /// タイマー割り込みが発行される。
     pub fn tick_in(&mut self, t: Duration) {
-        unimplemented!()
+        self.registers.CS.write(1u32 << 1);
+
+        let fire = self.registers.CLO.read()
+            .wrapping_add((t.as_nanos() as u64 / TICK_NANOS as u64) as u32);
+        self.registers.COMPARE[1].write(fire);
     }
 }
 
@@ -51,15 +59,16 @@ pub fn current_time() -> Duration {
     Timer::new().read()
 }
 
-/// Spins until `t` duration have passed.
+/// `t` 時間が過ぎるまでスピンする.
 pub fn spin_sleep(t: Duration) {
     let start = current_time();
     while current_time() < start + t {}
 }
 
-/// Sets up a match in timer 1 to occur `t` duration from now. If
-/// interrupts for timer 1 are enabled and IRQs are unmasked, then a timer
-/// interrupt will be issued in `t` duration.
+/// 現在から `t` 時間後にタイマー1のマッチが発生するように設定する。
+/// タイマー1の割り込みが有効かつIRQがアンマスクの場合、`t` 時間後に
+/// タイマー割り込みが発行される。
 pub fn tick_in(t: Duration) {
-    unimplemented!()
+    let mut timer = Timer::new();
+    timer.tick_in(t);
 }

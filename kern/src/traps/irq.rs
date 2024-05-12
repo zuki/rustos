@@ -18,15 +18,20 @@ impl Irq {
         *self.0.lock() = Some([None, None, None, None, None, None, None, None]);
     }
 
-    /// Register an irq handler for an interrupt.
-    /// The caller should assure that `initialize()` has been called before calling this function.
+    /// 割り込み `int` 用ののirqハンドラを登録する.
+    /// callerはこの関数を呼び出す前に `initialize()` を呼び出しておく必要がある。
     pub fn register(&self, int: Interrupt, handler: IrqHandler) {
-        unimplemented!("Irq::register()")
+        if let Some(handlers) = self.0.lock().as_mut() {
+            handlers[Interrupt::to_index(int)] = Some(handler);
+        }
     }
 
-    /// Executes an irq handler for the givven interrupt.
-    /// The caller should assure that `initialize()` has been called before calling this function.
+    /// 指定された割り込みのirqハンドラを実行する.
+    /// callerはこの関数を呼び出す前に `initialize()` を呼び出しておく必要がある。
     pub fn invoke(&self, int: Interrupt, tf: &mut TrapFrame) {
-        unimplemented!("Irq::register()")
+        if let Some(handlers) = self.0.lock().as_mut() {
+            let handler = &mut handlers[Interrupt::to_index(int)];
+            handler.as_mut().unwrap()(tf);
+        }
     }
 }

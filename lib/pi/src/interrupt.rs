@@ -77,34 +77,64 @@ impl From<usize> for Interrupt {
 #[allow(non_snake_case)]
 struct Registers {
     // FIXME: Fill me in.
+    IRQ_BASIC_PENDING: ReadVolatile<u32>,
+    IRQ_PENDING_1: ReadVolatile<u32>,
+    IRQ_PENDING_2: ReadVolatile<u32>,
+    FIQ_CONTROL: Volatile<u32>,
+    ENABLE_IRQ_1: Volatile<u32>,
+    ENABLE_IRQ_2: Volatile<u32>,
+    ENABLE_BASIC_IRQ: Volatile<u32>,
+    DISABLE_IRQ_1: Volatile<u32>,
+    DISABLE_IRQ_2: Volatile<u32>,
+    DISABLE_BASIC_IRQ: Volatile<u32>,
 }
 
-/// An interrupt controller. Used to enable and disable interrupts as well as to
-/// check if an interrupt is pending.
+/// 割り込みコントローラー. 割り込みの有効化、無効化、保留中の
+/// 割り込みのチェックに使用される。
 pub struct Controller {
     registers: &'static mut Registers
 }
 
 impl Controller {
-    /// Returns a new handle to the interrupt controller.
+    /// 割り込みコントローラへの新規ハンドルを返す.
     pub fn new() -> Controller {
         Controller {
             registers: unsafe { &mut *(INT_BASE as *mut Registers) },
         }
     }
 
-    /// Enables the interrupt `int`.
+    /// 番号 `int` の割り込みを有効にする.
     pub fn enable(&mut self, int: Interrupt) {
-        unimplemented!()
+        let index = int as u32;
+        if index < 32 {
+            self.registers.ENABLE_IRQ_1.write(
+                self.registers.ENABLE_IRQ_1.read() | (1 << index));
+        } else {
+            self.registers.ENABLE_IRQ_2.write(
+                self.registers.ENABLE_IRQ_2.read() | (1 << (index - 32)));
+        }
     }
 
-    /// Disables the interrupt `int`.
+    /// 番号 `int` の割り込みを無効にする.
     pub fn disable(&mut self, int: Interrupt) {
-        unimplemented!()
+        let index = int as u32;
+        if index < 32 {
+            self.registers.DISABLE_IRQ_1.write(
+                self.registers.DISABLE_IRQ_1.read() | (1 << index));
+        } else {
+            self.registers.DISABLE_IRQ_2.write(
+                self.registers.DISABLE_IRQ_2.read() | (1 << (index - 32)));
+        }
     }
 
-    /// Returns `true` if `int` is pending. Otherwise, returns `false`.
+    /// 番号 `int` の割り込みが保留中の場合は `true` を返す。
+    /// そうでなければ `false` を返す.
     pub fn is_pending(&self, int: Interrupt) -> bool {
-        unimplemented!()
+        let index = int as u32;
+        if index < 32 {
+            (self.registers.IRQ_PENDING_1.read()) & (1 << index) != 0
+        } else {
+            (self.registers.IRQ_PENDING_2.read()) & (1 << (index - 32)) != 0
+        }
     }
 }

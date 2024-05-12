@@ -7,8 +7,12 @@ use aarch64::*;
 use crate::mutex::Mutex;
 use crate::param::{PAGE_MASK, PAGE_SIZE, TICK, USER_IMG_BASE};
 use crate::process::{Id, Process, State};
-use crate::traps::TrapFrame;
+use crate::traps::{irq, TrapFrame};
 use crate::VMM;
+use crate::IRQ;
+use crate::console::kprintln;
+use pi::timer;
+use pi::interrupt::{Interrupt, Controller};
 
 /// マシン全体用のプロセススケジューラ.
 #[derive(Debug)]
@@ -78,6 +82,19 @@ impl GlobalScheduler {
         tf.sp = process.stack.top().as_u64();
         // 最初のプロセスなので1をセット
         tf.tpidr = 1;
+
+        // タイマー割り込みハンドラの設定
+        IRQ.register(
+            Interrupt::Timer1,
+            Box::new(|tf| {
+                kprintln!("TICK");
+                timer::tick_in(TICK);
+            }),
+        );
+        // タイマー割り込みの有効化
+        let mut controller = Controller::new();
+        controller.enable(Interrupt::Timer1);
+        timer::tick_in(TICK);
 
         // spにトラップフレームをセットしてcontext_restore
         unsafe {
@@ -195,10 +212,10 @@ pub extern "C" fn  test_user_process() -> ! {
 pub extern "C" fn start_shell() -> ! {
     use crate::shell;
 
-    unsafe { asm!("brk 1" :::: "volatile"); }
-    unsafe { asm!("brk 2" :::: "volatile"); }
-    shell::shell("user0> ");
-    unsafe { asm!("brk 3" :::: "volatile"); }
+    //unsafe { asm!("brk 1" :::: "volatile"); }
+    //unsafe { asm!("brk 2" :::: "volatile"); }
+    //shell::shell("user0> ");
+    //unsafe { asm!("brk 3" :::: "volatile"); }
     loop {
         shell::shell("user1> ");
     }

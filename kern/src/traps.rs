@@ -10,6 +10,7 @@ use pi::interrupt::{Controller, Interrupt};
 use self::syndrome::Syndrome;
 use self::syscall::handle_syscall;
 use crate::console::{CONSOLE, kprint, kprintln};
+use crate::IRQ;
 use aarch64::*;
 
 #[repr(u16)]
@@ -43,18 +44,32 @@ pub struct Info {
 #[no_mangle]
 pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
     kprintln!("info: {:?}, esr: 0x{:x}", info, esr);
-    if info.kind == Kind::Synchronous {
-        match Syndrome::from(esr) {
-            Syndrome::Brk(n) => {
-                kprintln!("Syndrome::Brk({})", n);
-                kprintln!("  ELR: 0x{:x}", tf.elr);
-                crate::shell::shell("debug > ");
-                tf.elr += 4;
+    match info.kind {
+        Kind::Synchronous => {
+            match Syndrome::from(esr) {
+                Syndrome::Brk(n) => {
+                    kprintln!("Syndrome::Brk({})", n);
+                    kprintln!("  ELR: 0x{:x}", tf.elr);
+                    crate::shell::shell("debug > ");
+                    tf.elr += 4;
+                }
+                Syndrome::Svc(n) => {
+                    kprintln!("Syndrome::Svc({})", n);
+                }
+                s => kprintln!("{:?}", s),
             }
-            Syndrome::Svc(n) => {
-                kprintln!("Syndrome::Svc({})", n);
+        }
+        Kind::Irq => {
+            let controller = Controller::new();
+            for int in Interrupt::iter() {
+                if controller.is_pending(*int) {
+                    kprintln!("IRQ: {:?}", *int as u32);
+                    IRQ.invoke(*int, tf);
+                }
             }
-            s => kprintln!("{:?}", s),
+        }
+        _ => {
+            //
         }
     }
 }
