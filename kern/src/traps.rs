@@ -43,7 +43,7 @@ pub struct Info {
 /// レジスタの値、`tf`は例外のトラップフレームへのポインタである。
 #[no_mangle]
 pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
-    kprintln!("info: {:?}, esr: 0x{:x}", info, esr);
+    //kprintln!("info: {:?}, esr: 0x{:x}", info, esr);
     match info.kind {
         Kind::Synchronous => {
             match Syndrome::from(esr) {
@@ -63,7 +63,7 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
             let controller = Controller::new();
             for int in Interrupt::iter() {
                 if controller.is_pending(*int) {
-                    kprintln!("IRQ: {:?}", *int as u32);
+                    //kprintln!("IRQ: {:?}", *int as u32);
                     IRQ.invoke(*int, tf);
                 }
             }

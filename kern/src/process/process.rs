@@ -1,5 +1,6 @@
 #![feature(new_uninit)]
 use alloc::boxed::Box;
+use core::mem;
 use shim::io;
 use shim::path::Path;
 
@@ -93,21 +94,37 @@ impl Process {
         unimplemented!();
     }
 
-    /// Returns `true` if this process is ready to be scheduled.
+    /// このプロセスがスケジュールされる準備ができている場合は
+    /// `true` を返す。
     ///
-    /// This functions returns `true` only if one of the following holds:
+    /// この関数は次のどちらかに該当する場合のみ `true` を返す。
     ///
-    ///   * The state is currently `Ready`.
+    ///   * 現在の状態が `Ready`.
     ///
-    ///   * An event being waited for has arrived.
+    ///   * 待機していたイベントが届いた。
     ///
-    ///     If the process is currently waiting, the corresponding event
-    ///     function is polled to determine if the event being waiting for has
-    ///     occured. If it has, the state is switched to `Ready` and this
-    ///     function returns `true`.
+    ///     プロセスが現在待機中の場合、対応するイベント関数が
+    ///     ポーリングされ、待機中のイベントが発生したか否かを
+    ///     判断する。発生していた場合は状態を `Ready` に切り替え、
+    ///     この関数は `true` を返す。
     ///
-    /// Returns `false` in all other cases.
+    /// それ以外のすべての場合は `false` を返す。
     pub fn is_ready(&mut self) -> bool {
-        unimplemented!("Process::is_ready()")
+        let mut state = mem::replace(&mut self.state, State::Ready);
+        match state {
+            State::Ready => true,
+            State::Waiting(ref mut event_poll_fn) => {
+                if event_poll_fn(self) {
+                    true
+                } else {
+                    self.state = state;
+                    false
+                }
+            }
+            _ => {
+                self.state = state;
+                false
+            }
+        }
     }
 }

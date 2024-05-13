@@ -10,6 +10,7 @@ use crate::process::{Id, Process, State};
 use crate::traps::{irq, TrapFrame};
 use crate::VMM;
 use crate::IRQ;
+use crate::SCHEDULER;
 use crate::console::kprintln;
 use pi::timer;
 use pi::interrupt::{Interrupt, Controller};
@@ -72,22 +73,13 @@ impl GlobalScheduler {
     /// 使ってユーザ空間のプロセスの実行を開始する。このメソッドは
     /// 通常の条件では復帰しない。
     pub fn start(&self) -> ! {
-        let process = Process::new().expect("new process");
-        let mut tf = process.context;
-        // 例外からの戻り先はstart_shell()関数
-        tf.elr = start_shell as *const u64 as u64;
-        // SPSR_EL1をセット。IRQはアンマスク
-        tf.spsr = (SPSR_EL1::M & 0b0000) | SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
-        // SP_EL0はこのプロセスのスタックのtop
-        tf.sp = process.stack.top().as_u64();
-        // 最初のプロセスなので1をセット
-        tf.tpidr = 1;
-
         // タイマー割り込みハンドラの設定
         IRQ.register(
             Interrupt::Timer1,
             Box::new(|tf| {
-                kprintln!("TICK");
+                let old_id = tf.tpidr;
+                let id = SCHEDULER.switch(State::Ready, tf);
+                kprintln!("TICK, switch from {} to {}", old_id, id);
                 timer::tick_in(TICK);
             }),
         );
@@ -95,6 +87,9 @@ impl GlobalScheduler {
         let mut controller = Controller::new();
         controller.enable(Interrupt::Timer1);
         timer::tick_in(TICK);
+
+        let mut tf = Box::new(TrapFrame::default());
+        self.critical(|scheduler| scheduler.switch_to(&mut tf));
 
         // spにトラップフレームをセットしてcontext_restore
         unsafe {
@@ -112,9 +107,36 @@ impl GlobalScheduler {
         loop {};
     }
 
+
+
     /// スケジューラを初期化してユーザ空間のプロセスをスケジューラに追加する.
     pub unsafe fn initialize(&self) {
-        unimplemented!("GlobalScheduler::initialize()")
+        let mut process1 = Process::new().expect("new process");
+        let mut tf1 = &mut process1.context;
+        // 例外からの戻り先はstart_shell()関数
+        tf1.elr = start_shell as *const u64 as u64;
+        // SPSR_EL1をセット。IRQはアンマスク
+        tf1.spsr = (SPSR_EL1::M & 0b0000) | SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
+        // SP_EL0はこのプロセスのスタックのtop
+        tf1.sp = process1.stack.top().as_u64();
+
+        let mut process2 = Process::new().expect("new process");
+        let mut tf2 = &mut process2.context;
+        tf2.elr = test_proc_2 as *const u64 as u64;
+        tf2.spsr = (SPSR_EL1::M & 0b0000) | SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
+        tf2.sp = process2.stack.top().as_u64();
+
+        let mut process3 = Process::new().expect("new process");
+        let mut tf3 = &mut process3.context;
+        tf3.elr = test_proc_3 as *const u64 as u64;
+        tf3.spsr = (SPSR_EL1::M & 0b0000) | SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
+        tf3.sp = process3.stack.top().as_u64();
+
+        let mut scheduler = Scheduler::new();
+        scheduler.add(process1);
+        scheduler.add(process2);
+        scheduler.add(process3);
+        *self.0.lock() = Some(scheduler);
     }
 
     // 次のメソッドはフェーズ3のテストに役に立つだろう。
@@ -137,48 +159,88 @@ impl GlobalScheduler {
 
 #[derive(Debug)]
 pub struct Scheduler {
+    /// プロセスキュー
     processes: VecDeque<Process>,
+    // プロセスID付番用
     last_id: Option<Id>,
 }
 
 impl Scheduler {
-    /// からのキューを持つ新しい `Scheduler` を返す.
+    /// 空のキューを持つ新しい `Scheduler` を返す.
     fn new() -> Scheduler {
-        unimplemented!("Scheduler::new()")
+        Scheduler {
+            processes: VecDeque::<Process>::new(),
+            last_id: None,
+        }
     }
 
     /// プロセスをスケジューラのキューに追加し、新しいプロセスが
-    /// スケジューリング可能であればそのプロセスのIDを返す。
-    /// プロセスIDはそのプロセスに新しく割り当てられたものであり、
-    /// `trap_frame` に保存されている。スケジュールできるプロセスが
-    /// ない場合は `None` を返す。
+    /// スケジューリング可能であればそのプロセスにプロセスIDを
+    /// 新しく割り当て、`trap_frame` に保存して、そのIDを返す。
+    /// スケジュールできない場合は `None` を返す。
     ///
     /// 最初の `switch` の呼び出しとそのプロセスがCPU上で実行される
     /// ようにすることは呼び出し側の責任である。
     fn add(&mut self, mut process: Process) -> Option<Id> {
-        unimplemented!("Scheduler::add()")
+        let id = match self.last_id {
+            Some(core::u64::MAX) => {
+                return None;
+            }
+            Some(last_id) => last_id + 1,
+            None => 1,
+        };
+        self.last_id = Some(id);
+        process.context.tpidr = id;
+        self.processes.push_back(process);
+        Some(id)
     }
 
     /// 現在実行中のプロセスを見つけ、現在のプロセスの状態を `new_state` に
-    /// セットし、`tf` を現在のプロセスにセーブして `tf` によるコンテキスト
-    /// スイッチを準備し、現在のプロセスを `processes` キューの末尾に
-    /// プッシュする。
+    /// 変更し、`tf` を現在のプロセスにセーブして `tf` によるコンテキスト
+    /// スイッチを準備した後、現在のプロセスを `processes` キューの末尾に
+    /// 移動させる。
     ///
     /// プロセス `processes` キューが空であるか、現在のプロセスが存在しない
     /// 場合は `false` を返す。それ以外の場合は `true` を返す。
     fn schedule_out(&mut self, new_state: State, tf: &mut TrapFrame) -> bool {
-        unimplemented!("Scheduler::schedule_out()")
+        match self.current_process(tf) {
+            Some(index) => {
+                let mut process = self.processes.remove(index).unwrap();
+                process.state = new_state;
+                process.context = Box::new(*tf);
+                self.processes.push_back(process);
+                true
+            }
+            None => false
+        }
     }
 
-    /// 次に切り替えるべきプロセスを見つけ、その次のプロセスを `processes`
-    /// キューの先頭に持ってきて、次のプロセスの状態を `Running` に変更し、
-    /// 次のプロセスのトラップフレームを `tf` に復元することでコンテキスト
-    /// スイッチを行う。
+    /// 次に切り替えるべきプロセスを見つけ、そのプロセスを `processes`
+    /// キューの先頭に移動させ、状態を `Running` に変更し、トラップ
+    /// フレームを `tf` に復元することでコンテキストスイッチを行う。
     ///
     /// 切り替えるプロセスがない場合は `None` を返す。そうでない場合は、
-    /// 次のプロセスのプロセス IDの `Some` を返す。
+    /// 切り替えるプロセスのプロセス IDの `Some` を返す。
     fn switch_to(&mut self, tf: &mut TrapFrame) -> Option<Id> {
-        unimplemented!("Scheduler::switch_to()")
+        let mut index: usize = 0;
+        for p in self.processes.iter_mut() {
+            if p.is_ready() {
+                break;
+            } else {
+                index += 1;
+            }
+        }
+        // 切り替えるプロセスがない
+        if index == self.processes.len() {
+            return None;
+        }
+
+        let mut process = self.processes.remove(index).unwrap();
+        process.state = State::Ready;
+        *tf = *process.context;
+        let id = process.context.tpidr;
+        self.processes.push_front(process);
+        Some(id)
     }
 
     /// 現在のプロセスを `Dead` 状態としてスケジューリングから外すことで
@@ -186,8 +248,34 @@ impl Scheduler {
     /// 死んだプロセスのインスタンスをdropし、死んだプロセスのプロセスIDを
     /// 返す。
     fn kill(&mut self, tf: &mut TrapFrame) -> Option<Id> {
-        unimplemented!("Scheduler::kill()")
+        match self.current_process(tf) {
+            Some(index) => {
+                let mut process = self.processes.remove(index).unwrap();
+                process.state = State::Dead;
+                Some(process.context.tpidr)
+            }
+            None => None,
+        }
     }
+
+    /// カレントプロセスのキューでのインデックスを返す
+    fn current_process(&mut self, tf: &mut TrapFrame) -> Option<usize> {
+        let mut index: usize = 0;
+        for p in self.processes.iter_mut() {
+            if p.context.tpidr == tf.tpidr {
+                break;
+            } else {
+                index += 1;
+            }
+        }
+        // カレントプロセスがない
+        if index == self.processes.len() {
+            None
+        } else {
+            Some(index)
+        }
+    }
+
 }
 
 pub extern "C" fn  test_user_process() -> ! {
@@ -218,5 +306,19 @@ pub extern "C" fn start_shell() -> ! {
     //unsafe { asm!("brk 3" :::: "volatile"); }
     loop {
         shell::shell("user1> ");
+    }
+}
+
+pub extern "C" fn test_proc_2() -> ! {
+    use crate::shell;
+    loop {
+        shell::shell("user2> ");
+    }
+}
+
+pub extern "C" fn test_proc_3() -> ! {
+    use crate::shell;
+    loop {
+        shell::shell("user3> ");
     }
 }
