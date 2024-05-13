@@ -1838,3 +1838,78 @@ kprintln!("current el = {}", unsafe { aarch64::current_el() });
 - Brk割り込みを削除すると最初からIRQ割り込みが処理される（画面はQEMUで実行）
 
 ![タイマー割り込み2](images/timer_int_2.png)
+
+# lab4: phase 2, Subphase D: スケジューラ
+
+- 実装(1)の「mem::replace()関数が役に立つことが証明」は次のことだった
+
+   普通にマッチさせただけでは可変借用を2回することになりエラー
+
+```rust
+pub fn is_ready(&mut self) -> bool {
+   match &mut self.state {
+      State::Ready => true,
+      State::Waiting(ref mut event_poll_fn) => {
+            if event_poll_fn(self) {
+               true
+            } else {
+               false
+            }
+      }
+      _ => false,
+   }
+}
+
+error[E0499]: cannot borrow `*self` as mutable more than once at a time
+--> src/process/process.rs:117:34
+   |
+114 |         match &mut self.state {
+   |               --------------- first mutable borrow occurs here
+...
+117 |                 if event_poll_fn(self) {
+   |                    ------------- ^^^^ second mutable borrow occurs here
+   |                    |
+   |                    first borrow later used by call
+```
+
+- 次のように`pub fn replace<T>(dest: &mut T, src: T) -> T`を使う
+
+```rust
+pub fn is_ready(&mut self) -> bool {
+   // ここで現在のstateを取り出し`Ready`に置換する
+   let mut state = mem::replace(&mut self.state, State::Ready);
+   match state {
+      State::Ready => true,
+      State::Waiting(ref mut event_poll_fn) => {
+            if event_poll_fn(self) {
+               // イベントが発生したのでReadyに変えたままでOK
+               true
+            } else {
+               // イベントは発生していないので状態をWaitingに戻しておく
+               self.state = state;
+               false
+            }
+      }
+      _ => {
+            // 状態を元に戻しておく
+            self.state = state;
+            false
+      }
+   }
+}
+```
+
+## コンテキストスイッチ
+
+1. カレントプロセスのトラップフレームを保存
+
+   - `fn schedule_out(&mut self, new_state: State, tf: &mut TrapFrame) -> bool`
+   - `tf`をカレントプロセスのトラップフレームにセット（保存）する
+
+2. 次に実行するプロセスのトラップフレームを復元
+
+   - `fn switch_to(&mut self, tf: &mut TrapFrame) -> Option<Id>`
+   - 実行するプロセスのトラップフレームを`tf`にセット（復元）する
+
+
+![実行画面](images/scheduler.png)
