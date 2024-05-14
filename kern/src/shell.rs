@@ -5,8 +5,10 @@ use alloc::string::String;
 
 use stack_vec::StackVec;
 use core::str;
+use core::time::Duration;
 
 use pi::atags::Atags;
+use kernel_api::syscall::sleep;
 
 use fat32::traits::FileSystem;
 use fat32::traits::{Dir, Entry, File};
@@ -148,6 +150,20 @@ fn do_cat(path: &PathBuf)  {
     }
 }
 
+fn do_sleep(ms: &str) {
+    use core::str::FromStr;
+
+    match u32::from_str(ms) {
+        Ok(span) => {
+            match sleep(Duration::from_millis(span as u64)) {
+                Ok(elapsed) => kprintln!("wake up {} miliisec", elapsed.as_millis()),
+                Err(e) => kprintln!("error occured: {:?}", e),
+            }
+        }
+        Err(_) => kprintln!("span is not number"),
+    }
+}
+
 /// 各行のプリフィックスとして`prefix`を使ってシェルを開始する。
 /// `exit`コマンドが呼び出されたらこの関数はリターンする。
 pub fn shell(prefix: &str) -> () {
@@ -218,6 +234,14 @@ pub fn shell(prefix: &str) -> () {
                                     1 => {
                                         do_ls(&cwd, false);
                                     }
+                                    _ => kprintln!("too many args"),
+                                }
+                            }
+                            &"sleep" => {
+                                kprint!("\n");
+                                match command.args.len() {
+                                    2 => do_sleep(command.args[1]),
+                                    1 => kprintln!("need sleep time"),
                                     _ => kprintln!("too many args"),
                                 }
                             }
