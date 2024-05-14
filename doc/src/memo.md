@@ -1913,3 +1913,16 @@ pub fn is_ready(&mut self) -> bool {
 
 
 ![実行画面](images/scheduler.png)
+
+# lab4: phase 2, Subphase E: スリープ
+
+- すべてのプロセスがスリープすると次に実行すべきプロセスがなくなる。
+- スケジューラは実行すべきプロセスがないと`wfe`で待機しているがこれは
+   割り込みでは起床しない。下のように何も起きない.
+
+![wfe](images/sleep_wfe.png)
+
+- 実行すべきプロセスがない場合に`wfi`で待機するように変更すると
+   割り込みで起床するので起床したプロセスが実行される。
+
+![wfi](images/sleep_wfi.png)
