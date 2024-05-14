@@ -58,7 +58,8 @@ impl GlobalScheduler {
             if let Some(id) = rtn {
                 return id;
             }
-            aarch64::wfe();
+            //aarch64::wfe();
+            aarch64::wfi();
         }
     }
 
