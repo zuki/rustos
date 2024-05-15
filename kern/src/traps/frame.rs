@@ -7,6 +7,8 @@ pub struct TrapFrame {
     pub spsr: u64,
     pub sp: u64,
     pub tpidr: u64,
+    pub ttbr0: u64,
+    pub ttbr1: u64,
     pub qn: [u128; 32],
     pub xn: [u64; 31],
     pub zero: u64,

@@ -85,22 +85,22 @@ macro_rules! impl_for {
         }
 
         impl $T {
-            /// Returns the inner address of `self`.
+            /// `self` の内部アドレスを返す.
             pub fn as_ptr(&self) -> *const u8 {
                 self.0 as *const u8
             }
 
-            /// Returns the inner address of `self`.
+            /// `self` の内部アドレスを返す.
             pub fn as_mut_ptr(&mut self) -> *mut u8 {
                 self.0 as *mut u8
             }
 
-            /// Returns the inner address of `self` as a `usize`.
+            /// `self` の内部アドレスを `usize` として返す.
             pub fn as_usize(&self) -> usize {
                 self.0
             }
 
-            /// Returns the inner address of `self` as a `u64`.
+            /// `self` の内部アドレスを `u64` として返す.
             #[cfg(target_pointer_width = "64")]
             pub fn as_u64(&self) -> u64 {
                 self.0 as u64
