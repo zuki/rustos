@@ -48,6 +48,7 @@ context_save:
     mov x0, x29
     mrs x1, ESR_EL1
     mov x2, SP
+    mrs x3, FAR_EL1
     // この関数を呼んだ際のLRを保存
     stp xzr, lr, [SP, #-16]!
     // handle_exceptionの呼び出し
