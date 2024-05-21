@@ -8,6 +8,7 @@ rustflags = [
     "-C", "link-arg=--script=.cargo/layout.ld",
     "-C", "link-arg=--no-dynamic-linker",
     "-C", "link-arg=--no-dynamic-linker",
+    "-C", "relocation-model=static",
 
     # link to libsd.a
     "-C", "link-arg=-L.cargo",
