@@ -69,6 +69,13 @@ defbit!(RawL3Entry, [
     VALID [00-00],
 ]);
 
+defbit!(VirtualAddrEntry, [
+    TBBR    [63-42],
+    L2INDEX [41-29],
+    L3INDEX [28-16],
+    PA      [15-0],
+]);
+
 // (ref. D7.2.70: Memory Attribute Indirection Register)
 defreg!(MAIR_EL1, [
     Attr7 [63-56],
@@ -108,7 +115,7 @@ defreg!(ID_AA64MMFR0_EL1, [
 
 // For Phase5, (ref. 7.2.86: Implementation Defined Registers)
 defreg!(S3_1_C15_C2_1);
-// << 
+// <<
 
 impl fmt::Debug for RawL2Entry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -124,9 +131,7 @@ impl fmt::Debug for RawL2Entry {
             write!(f, "T")?;
         }
 
-        write!(f, "-> {:x} ({:x})",
-               self.get_masked(RawL2Entry::ADDR),
-               self.get())
+        write!(f, "-> 0x{:08X}", self.get_masked(RawL2Entry::ADDR))
     }
 }
 
@@ -172,8 +177,6 @@ impl fmt::Debug for RawL3Entry {
 
         // NS    [05-05],
 
-        write!(f, "-> {:08x} ({:x})",
-               self.get_masked(RawL3Entry::ADDR),
-               self.get())
+        write!(f, "-> 0x{:08X}", self.get_masked(RawL3Entry::ADDR))
     }
 }

@@ -11,6 +11,7 @@ use crate::process::{Stack, State};
 use crate::traps::TrapFrame;
 use crate::vm::*;
 use kernel_api::{OsError, OsResult};
+use crate::console::kprintln;
 
 /// プロセスID型用のType alias.
 pub type Id = u64;
@@ -23,7 +24,7 @@ pub struct Process {
     /// プロセスのスタック用に使用するメモリ割り当て.
     pub stack: Stack,
     /// プロセスの仮想メモリを記述するページテーブル
-    // pub vmap: Box<UserPageTable>,
+    pub vmap: Box<UserPageTable>,
     /// プロセスのスケジューリング状態.
     pub state: State,
 }
@@ -37,10 +38,11 @@ impl Process {
     /// の `Some` を返す。
     pub fn new() -> OsResult<Process> {
         let stack = Stack::new().ok_or(OsError::NoMemory)?;
-
+        //kprintln!("Procwss::new: call UserPageTable::new");
         Ok(Process {
-            context: Box::new(Default::default()),
+            context: Box::new(TrapFrame::default()),
             stack,
+            vmap: Box::new(UserPageTable::new()),
             state: State::Ready,
         })
     }

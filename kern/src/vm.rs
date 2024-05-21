@@ -10,41 +10,48 @@ pub use self::address::{PhysicalAddr, VirtualAddr};
 pub use self::pagetable::*;
 use crate::param::{KERNEL_MASK_BITS, USER_MASK_BITS};
 
-/// Thread-safe (locking) wrapper around a kernel page table.
+/// カーネルページテーブルのスレッドセーフ（lockng) のラッパーe.
 pub struct VMManager(Mutex<Option<KernPageTable>>);
 
 impl VMManager {
-    /// Returns an uninitialized `VMManager`.
+    /// 初期化していない `VMManager` を返す.
     ///
-    /// The virtual memory manager must be initialized by calling `initialize()` and `setup()`
-    /// before the first memory allocation. Failure to do will result in panics.
+    /// 仮想メモリマネージャは始めてのメモリ割り当ての前に
+    /// `initialize()` と `setup()` を呼び出して初期化しなければ
+    /// ならない。これを怠るとパニックになる。
     pub const fn uninitialized() -> Self {
         VMManager(Mutex::new(None))
     }
 
-    /// Initializes the virtual memory manager.
-    /// The caller should assure that the method is invoked only once during the kernel
-    /// initialization.
+    /// 仮想メモリマネージャを初期化するr.
+    /// callerはカーネル初期化中にこの関数を一度だけ
+    /// 呼び出さなければならない。
     pub fn initialize(&self) {
-        unimplemented!();
+        //kprintln!("ininitaiize VMM: call KernPageTabel::new");
+        *self.0.lock() = Some(KernPageTable::new());
+        self.setup();
     }
 
-    /// Set up the virtual memory manager.
-    /// The caller should assure that `initialize()` has been called before calling this function.
-    /// Sets proper configuration bits to MAIR_EL1, TCR_EL1, TTBR0_EL1, and TTBR1_EL1 registers.
+    /// 仮想メモリマネージャを設定するr.
+    /// callerはこの関数を呼ぶ前にかならず `initialize()` を
+    /// 呼び出していなければならない.
+    /// MAIR_EL1, TCR_EL1, TTBR0_EL1, TTBR1_EL1 の各レジスタに適切な設定フラグをセットする。
     ///
-    /// # Panics
+    /// # パニック
     ///
-    /// Panics if the current system does not support 64KB memory translation granule size.
+    /// カレントシステムが64KB粒度のメモリ変換をサポートして
+    /// いないとパニックになる。
     pub fn setup(&self) {
         let kern_page_table = self.0.lock();
+        kprintln!("{:?}", kern_page_table.as_ref().unwrap());
         let baddr = kern_page_table.as_ref().unwrap().get_baddr().as_u64();
 
         unsafe {
+            // 64KB粒度をサポート
             assert!(ID_AA64MMFR0_EL1.get_value(ID_AA64MMFR0_EL1::TGran64) == 0);
-
+            // ips = 0b0010 : 40ビット 1TB
             let ips = ID_AA64MMFR0_EL1.get_value(ID_AA64MMFR0_EL1::PARange);
-
+            //kprintln!("ips: 0x{:X}", ips);
             // (ref. D7.2.70: Memory Attribute Indirection Register)
             MAIR_EL1.set(
                 (0xFF <<  0) |// AttrIdx=0: normal, IWBWA, OWBWA, NTR
@@ -75,15 +82,17 @@ impl VMManager {
 
             asm!("dsb ish");
             isb();
-
+            //                                                           I            C M
+            // SCTLR_EL1: 0x0000_0000_30D0_0800 = 0011_0000_1101_0000/0000_1000_0000_0000
             SCTLR_EL1.set(SCTLR_EL1.get() | SCTLR_EL1::I | SCTLR_EL1::C | SCTLR_EL1::M);
             asm!("dsb sy");
             isb();
         }
     }
 
-    /// Returns the base address of the kernel page table as `PhysicalAddr`.
+    /// カーネルページテーブルのベースアドレスを `PhysicalAddrP` として返す.
     pub fn get_baddr(&self) -> PhysicalAddr {
-        unimplemented!();
+        let kern_page_table = self.0.lock();
+        PhysicalAddr::from(kern_page_table.as_ref().unwrap().get_baddr().as_u64())
     }
 }

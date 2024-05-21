@@ -11,7 +11,7 @@ use crate::traps::{irq, TrapFrame};
 use crate::VMM;
 use crate::IRQ;
 use crate::SCHEDULER;
-use crate::console::kprintln;
+use crate::console::{kprint, kprintln};
 use pi::timer;
 use pi::interrupt::{Interrupt, Controller};
 
@@ -78,20 +78,21 @@ impl GlobalScheduler {
         IRQ.register(
             Interrupt::Timer1,
             Box::new(|tf| {
+                timer::tick_in(TICK);
                 let old_id = tf.tpidr;
                 let id = SCHEDULER.switch(State::Ready, tf);
                 kprintln!("TICK, switch from {} to {}", old_id, id);
-                timer::tick_in(TICK);
             }),
         );
         // タイマー割り込みの有効化
+        timer::tick_in(TICK);
         let mut controller = Controller::new();
         controller.enable(Interrupt::Timer1);
-        timer::tick_in(TICK);
 
         let mut tf = Box::new(TrapFrame::default());
         self.critical(|scheduler| scheduler.switch_to(&mut tf));
 
+        //kprintln!("tf\n{:?}", tf);
         // spにトラップフレームをセットしてcontext_restore
         unsafe {
             asm!("mov x0, $0
@@ -104,6 +105,7 @@ impl GlobalScheduler {
                  :::: "volatile");
             asm!("mov x0, #0" :::: "volatile");
         }
+        //kprintln!("eret start");
         eret();
         loop {};
     }
@@ -112,6 +114,7 @@ impl GlobalScheduler {
 
     /// スケジューラを初期化してユーザ空間のプロセスをスケジューラに追加する.
     pub unsafe fn initialize(&self) {
+    /*
         let mut process1 = Process::new().expect("new process");
         let mut tf1 = &mut process1.context;
         // 例外からの戻り先はstart_shell()関数
@@ -132,30 +135,57 @@ impl GlobalScheduler {
         tf3.elr = test_proc_3 as *const u64 as u64;
         tf3.spsr = (SPSR_EL1::M & 0b0000) | SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
         tf3.sp = process3.stack.top().as_u64();
+*/
+
+        let mut process1 = Process::new().expect("new process");
+        //kprint!("{:?}", &process1.vmap);
+        let mut tf = &mut process1.context;
+        tf.elr = USER_IMG_BASE as *const u64 as u64;
+        tf.spsr = (SPSR_EL1::M & 0b0000) | SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
+        tf.sp = process1.stack.top().as_u64();
+        tf.ttbr0 = crate::VMM.get_baddr().as_u64();
+        tf.ttbr1 = process1.vmap.get_baddr().as_u64();
+        //kprintln!("proc1.tf:\n{:?}", tf);
+        //kprintln!("sp_bottom: 0x{:X}", process1.stack.bottom().as_u64());
+        self.test_phase_3(&mut process1);
+
+        let mut process2 = Process::new().expect("new process");
+        //kprint!("{:?}", &process2.vmap);
+        let mut tf = &mut process2.context;
+        tf.elr = USER_IMG_BASE as *const u64 as u64;
+        tf.spsr = (SPSR_EL1::M & 0b0000) | SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
+        tf.sp = process2.stack.top().as_u64();
+        tf.ttbr0 = crate::VMM.get_baddr().as_u64();
+        tf.ttbr1 = process2.vmap.get_baddr().as_u64();
+        //kprintln!("proc2.tf:\n{:?}", tf);
+        self.test_phase_3(&mut process2);
 
         let mut scheduler = Scheduler::new();
         scheduler.add(process1);
         scheduler.add(process2);
-        scheduler.add(process3);
+        //scheduler.add(process3);
         *self.0.lock() = Some(scheduler);
+
     }
 
     // 次のメソッドはフェーズ3のテストに役に立つだろう。
     //
     // * extern関数をユーザプロセスのページテーブルにロードするメソッド.
     //
-    // pub fn test_phase_3(&self, proc: &mut Process){
-    //     use crate::vm::{VirtualAddr, PagePerm};
-    //
-    //     let mut page = proc.vmap.alloc(
-    //         VirtualAddr::from(USER_IMG_BASE as u64), PagePerm::RWX);
-    //
-    //     let text = unsafe {
-    //         core::slice::from_raw_parts(test_user_process as *const u8, 24)
-    //     };
-    //
-    //     page[0..24].copy_from_slice(text);
-    // }
+    pub fn test_phase_3(&self, proc: &mut Process) {
+        use crate::vm::{VirtualAddr, PagePerm};
+
+        let mut page = proc.vmap.alloc(
+            VirtualAddr::from(USER_IMG_BASE as u64), PagePerm::RWX);
+
+            let text = unsafe {
+            core::slice::from_raw_parts(test_user_process as *const u8, 24)
+        };
+        //kprintln!("proc.tf\n{:?}", proc.context);
+        page[0..24].copy_from_slice(text);
+        kprint!("{:?}", &proc.vmap);
+    }
+
 }
 
 #[derive(Debug)]
@@ -192,6 +222,7 @@ impl Scheduler {
         };
         self.last_id = Some(id);
         process.context.tpidr = id;
+        //kprintln!("process {} added", id);
         self.processes.push_back(process);
         Some(id)
     }
@@ -235,11 +266,12 @@ impl Scheduler {
         if index == self.processes.len() {
             return None;
         }
-
+        //kprintln!("sw_to_before.tf\n{:?}", &tf);
         let mut process = self.processes.remove(index).unwrap();
         process.state = State::Ready;
         *tf = *process.context;
         let id = process.context.tpidr;
+        //kprintln!("sw_to_after.tf\n{:?}", &tf);
         self.processes.push_front(process);
         Some(id)
     }
@@ -281,7 +313,7 @@ impl Scheduler {
 
 pub extern "C" fn  test_user_process() -> ! {
     loop {
-        let ms = 10000;
+        let ms = 3000;
         let error: u64;
         let elapsed_ms: u64;
 

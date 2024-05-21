@@ -6,11 +6,14 @@ const_assert_size!(usize, 64 / 8);
 use core::time::Duration;
 pub use pi::common::*;
 
+// 1 << PAGE_ALIGN = PAGE_SIZE
 pub const PAGE_ALIGN: usize = 16;
 pub const PAGE_SIZE: usize = 64 * 1024;
 pub const PAGE_MASK: usize = !(PAGE_SIZE - 1);
 
+// USER_MASK_BITS = 1 << 34 = 0x4_0000_0000 = 16GB
 pub const USER_MASK_BITS: usize = 34;
+// KERNE_MAKS_BITS = 1 << 32 = 0x1_0000_0000 = 4GB
 pub const KERNEL_MASK_BITS: usize = 32;
 
 pub const USER_IMG_BASE: usize = 0xffff_ffff_c000_0000;
@@ -18,7 +21,8 @@ const_assert_eq!(
     USER_IMG_BASE,
     ((1 << USER_MASK_BITS) - 1) << (64 - USER_MASK_BITS)
 );
-pub const USER_STACK_BASE: usize = core::usize::MAX & PAGE_MASK; 
+// USER_STACK_BASE = 0xFFFF
+pub const USER_STACK_BASE: usize = core::usize::MAX & PAGE_MASK;
 pub const USER_MAX_VM_SIZE: usize = 0x4000_0000;
 const_assert_eq!(USER_IMG_BASE.wrapping_add(USER_MAX_VM_SIZE), 0);
 pub const KERN_STACK_BASE: usize = 0x80_000;
