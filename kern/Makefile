@@ -2,6 +2,7 @@ ROOT := $(shell git rev-parse --show-toplevel)
 
 KERN := kernel
 TARGET := target/aarch64-unknown-none/release/${KERN}
+TARGET-DEV := target/aarch64-unknown-none/debug/${KERN}
 SDCARD ?= $(ROOT)/ext/fat32-imgs/mock1.fat32.img
 # SDCARD ?= $(ROOT)/user/fs.img
 OBJCPY := cargo objcopy -- --strip-all -O binary
@@ -21,10 +22,22 @@ build:
 	@echo "+ Building build/$(KERN).bin [objcopy]"
 	@$(OBJCPY) $(TARGET) build/$(KERN).bin
 
+build-dev:
+	@echo "+ Building build/$(KERN).elf [xbuild/$@]"
+	@cargo xbuild
+	@mkdir -p build
+	@cp -f $(TARGET-DEV) build/$(KERN).elf
+
+	@echo "+ Building build/$(KERN).bin [objcopy]"
+	@$(OBJCPY) $(TARGET-DEV) build/$(KERN).bin
+
 check:
 	@cargo xcheck
 
 qemu: build
+	./qemu.sh build/$(KERN).bin -drive file=$(SDCARD),format=raw,if=sd $(QEMU_ARGS)
+
+qemu-dev: build-dev
 	./qemu.sh build/$(KERN).bin -drive file=$(SDCARD),format=raw,if=sd $(QEMU_ARGS)
 
 qemu-gdb: build
