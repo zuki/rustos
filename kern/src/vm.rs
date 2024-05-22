@@ -43,7 +43,8 @@ impl VMManager {
     /// いないとパニックになる。
     pub fn setup(&self) {
         let kern_page_table = self.0.lock();
-        kprintln!("{:?}", kern_page_table.as_ref().unwrap());
+        // カーネルページテーブルのデバッグ出力
+        //kprintln!("{:?}", kern_page_table.as_ref().unwrap());
         let baddr = kern_page_table.as_ref().unwrap().get_baddr().as_u64();
 
         unsafe {

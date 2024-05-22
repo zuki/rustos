@@ -94,16 +94,24 @@ impl GlobalScheduler {
 
         //kprintln!("tf\n{:?}", tf);
         // spにトラップフレームをセットしてcontext_restore
+        let size: usize = PAGE_SIZE;
+        let mask: usize = 0xFFFF_FFFF_FFFF_FFF0;
         unsafe {
             asm!("mov x0, $0
                   mov sp, x0"
                  :: "r"(tf)
                  :: "volatile");
             asm!("bl context_restore" :::: "volatile");
-            asm!("adr x0, _start
-                  mov sp, x0"
+            asm!("mov x1, sp
+                  add x1, x1, $0
+                  and x1, x1, $1
+                  mov sp, x1"
+                 :: "r"(size), "r"(mask)
+                 :: "volatile");
+            asm!("mov x0, xzr
+                  mov x1, xzr
+                  mov lr, xzr"
                  :::: "volatile");
-            asm!("mov x0, #0" :::: "volatile");
         }
         //kprintln!("eret start");
         eret();
@@ -114,56 +122,13 @@ impl GlobalScheduler {
 
     /// スケジューラを初期化してユーザ空間のプロセスをスケジューラに追加する.
     pub unsafe fn initialize(&self) {
-    /*
-        let mut process1 = Process::new().expect("new process");
-        let mut tf1 = &mut process1.context;
-        // 例外からの戻り先はstart_shell()関数
-        tf1.elr = start_shell as *const u64 as u64;
-        // SPSR_EL1をセット。IRQはアンマスク
-        tf1.spsr = (SPSR_EL1::M & 0b0000) | SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
-        // SP_EL0はこのプロセスのスタックのtop
-        tf1.sp = process1.stack.top().as_u64();
-
-        let mut process2 = Process::new().expect("new process");
-        let mut tf2 = &mut process2.context;
-        tf2.elr = test_proc_2 as *const u64 as u64;
-        tf2.spsr = (SPSR_EL1::M & 0b0000) | SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
-        tf2.sp = process2.stack.top().as_u64();
-
-        let mut process3 = Process::new().expect("new process");
-        let mut tf3 = &mut process3.context;
-        tf3.elr = test_proc_3 as *const u64 as u64;
-        tf3.spsr = (SPSR_EL1::M & 0b0000) | SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
-        tf3.sp = process3.stack.top().as_u64();
-*/
-
-        let mut process1 = Process::new().expect("new process");
-        //kprint!("{:?}", &process1.vmap);
-        let mut tf = &mut process1.context;
-        tf.elr = USER_IMG_BASE as *const u64 as u64;
-        tf.spsr = (SPSR_EL1::M & 0b0000) | SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
-        tf.sp = process1.stack.top().as_u64();
-        tf.ttbr0 = crate::VMM.get_baddr().as_u64();
-        tf.ttbr1 = process1.vmap.get_baddr().as_u64();
-        //kprintln!("proc1.tf:\n{:?}", tf);
-        //kprintln!("sp_bottom: 0x{:X}", process1.stack.bottom().as_u64());
-        self.test_phase_3(&mut process1);
-
-        let mut process2 = Process::new().expect("new process");
-        //kprint!("{:?}", &process2.vmap);
-        let mut tf = &mut process2.context;
-        tf.elr = USER_IMG_BASE as *const u64 as u64;
-        tf.spsr = (SPSR_EL1::M & 0b0000) | SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
-        tf.sp = process2.stack.top().as_u64();
-        tf.ttbr0 = crate::VMM.get_baddr().as_u64();
-        tf.ttbr1 = process2.vmap.get_baddr().as_u64();
-        //kprintln!("proc2.tf:\n{:?}", tf);
-        self.test_phase_3(&mut process2);
-
         let mut scheduler = Scheduler::new();
-        scheduler.add(process1);
-        scheduler.add(process2);
-        //scheduler.add(process3);
+
+        for _ in 0..4 {
+            let p = Process::load("/sleep").expect("load /mnt/sleep.bin");
+            scheduler.add(p);
+        }
+
         *self.0.lock() = Some(scheduler);
 
     }
@@ -183,7 +148,8 @@ impl GlobalScheduler {
         };
         //kprintln!("proc.tf\n{:?}", proc.context);
         page[0..24].copy_from_slice(text);
-        kprint!("{:?}", &proc.vmap);
+        // ユーザページテーブルのデバッグ出力
+        //kprint!("{:?}", &proc.vmap);
     }
 
 }

@@ -78,7 +78,6 @@ impl fat32::traits::FileSystem for &FileSystem {
     type Entry = fat32::vfat::Entry<PiVFatHandle>;
 
     fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
-        //self.0.lock().as_ref().expect("kernel::fs uninitialize").open(path)
         self.0.lock().as_ref().expect("kernel::fs uninitialized").open(path)
     }
 }
