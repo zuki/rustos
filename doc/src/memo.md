@@ -1926,3 +1926,814 @@ pub fn is_ready(&mut self) -> bool {
    割り込みで起床するので起床したプロセスが実行される。
 
 ![wfi](images/sleep_wfi.png)
+
+# lab4: phase 3, subphase B: ページテーブル
+
+- エラー
+
+```bash
+$ make qemu
++ Building build/kernel.elf [xbuild/build]
+    Finished release [optimized] target(s) in 0.02s
++ Building build/kernel.bin [objcopy]
+./qemu.sh build/kernel.bin -drive file=/home/vagrant/rustos/ext/fat32-imgs/mock1.fat32.img,format=raw,if=sd
+l3[0] addr = 0xd0000
+l3[1] addr = 0xe0000
+l2.entries[..2]
+  VT-> d0000 (d0703)
+  VT-> e0000 (e0703)
+l3[0].entries[..10]
+  VPMIA|KERN-RW-> 00000000 (703)
+  VPMIA|KERN-RW-> 00010000 (10703)
+  VPMIA|KERN-RW-> 00020000 (20703)
+  VPMIA|KERN-RW-> 00030000 (30703)
+  VPMIA|KERN-RW-> 00040000 (40703)
+  VPMIA|KERN-RW-> 00050000 (50703)
+  VPMIA|KERN-RW-> 00060000 (60703)
+  VPMIA|KERN-RW-> 00070000 (70703)
+  VPMIA|KERN-RW-> 00080000 (80703)
+  VPMIA|KERN-RW-> 00090000 (90703)
+l3[0] addr = 0x210000
+l3[1] addr = 0x220000
+allocated at 0xa0000
+UserPageTable.alloc at 0x0 V?MIA|USER-RW-> 000a0000 (a0741) # <= Typeが?
+copying at 0xffffffffc0000000
+l3[0] addr = 0x290000
+l3[1] addr = 0x2a0000
+allocated at 0x2e0000
+UserPageTable.alloc at 0x0 V?MIA|USER-RW-> 002e0000 (2e0741)
+copying at 0xffffffffc0000000
+process 1 added
+process 2 added
+            (
+       (      )     )
+         )   (    (
+        (          `
+    .-""^"""^""^"""^""-.
+  (//\\//\\//\\//\\//\\//)
+   ~\^^^^^^^^^^^^^^^^^^/~
+     `================`
+
+    The pi is overdone.
+
+---------- PANIC ----------
+
+FILE: src/traps.rs
+LINE: 60
+COL: 22
+
+Unexpected syndrome InstructionAbort { kind: Translation, level: 3 }
+QEMU: Terminated
+```
+
+- UserPTのL3EntryのTypeが`?`になるのはバグで修正
+- TranslationエラーからUnknownエラーに変化
+- デバッグ出力を追加
+
+## カーネルページテーブルの構造
+
+```bash
+   0x000C0000: L2Table
+   0x000D0000: L3Table[0]
+   0x00000000:   Entry[0]    : VPMIA|KERN-RW
+      ...
+   0x000E0000: L3Table[1]
+      ...
+   0x3FFF0000:   Entry[8191] : VPDOA|KERN-RW
+```
+
+## プロセス1のユーザページテーブルの構造
+
+```bash
+   0x00200000: L2Table
+   0x00210000: L3Table[0]
+   0x000A0000:   Entry[0] : VPMIA|KERN-RW
+   0x00220000: L3Table[1]
+```
+
+## プロセス2のユーザページテーブルの構造
+
+```bash
+   0x00280000: L2Table
+   0x00290000: L3Table[0]
+   0x002E0000:   Entry[0] : VPMIA|KERN-RW
+   0x002A0000: L3Table[1]
+```
+
+### 出力ログ
+
+```bash
+ininitaiize VMM: call KernPageTabel::new
+l3[0] addr = 0xd0000
+l3[1] addr = 0xe0000
+PT BASE_ADDR: 0x00000000000C0000
+memory_map: 0x9c088 - 0x3c000000
+l2.entries[..2]
+  VT-> 0x00000000000D0000 (0x00000000000D0703)
+l3[0].entries[..10]
+  VPMIA|KERN-RW-> 0x0000000000000000 (0x0000000000000703)
+  VPMIA|KERN-RW-> 0x0000000000010000 (0x0000000000010703)
+  VPMIA|KERN-RW-> 0x0000000000020000 (0x0000000000020703)
+  VPMIA|KERN-RW-> 0x0000000000030000 (0x0000000000030703)
+  VPMIA|KERN-RW-> 0x0000000000040000 (0x0000000000040703)
+  VPMIA|KERN-RW-> 0x0000000000050000 (0x0000000000050703)
+  VPMIA|KERN-RW-> 0x0000000000060000 (0x0000000000060703)
+  VPMIA|KERN-RW-> 0x0000000000070000 (0x0000000000070703)
+  VPMIA|KERN-RW-> 0x0000000000080000 (0x0000000000080703)
+  VPMIA|KERN-RW-> 0x0000000000090000 (0x0000000000090703)
+  VT-> 0x00000000000E0000 (0x00000000000E0703)
+l3[1].entries[8180..]
+  VPDOA|KERN-RW-> 0x000000003FF40000 (0x000000003FF40607)
+  VPDOA|KERN-RW-> 0x000000003FF50000 (0x000000003FF50607)
+  VPDOA|KERN-RW-> 0x000000003FF60000 (0x000000003FF60607)
+  VPDOA|KERN-RW-> 0x000000003FF70000 (0x000000003FF70607)
+  VPDOA|KERN-RW-> 0x000000003FF80000 (0x000000003FF80607)
+  VPDOA|KERN-RW-> 0x000000003FF90000 (0x000000003FF90607)
+  VPDOA|KERN-RW-> 0x000000003FFA0000 (0x000000003FFA0607)
+  VPDOA|KERN-RW-> 0x000000003FFB0000 (0x000000003FFB0607)
+  VPDOA|KERN-RW-> 0x000000003FFC0000 (0x000000003FFC0607)
+  VPDOA|KERN-RW-> 0x000000003FFD0000 (0x000000003FFD0607)
+  VPDOA|KERN-RW-> 0x000000003FFE0000 (0x000000003FFE0607)
+  VPDOA|KERN-RW-> 0x000000003FFF0000 (0x000000003FFF0607)
+
+Procwss::new: call UserPageTable::new
+l3[0] addr = 0x210000
+l3[1] addr = 0x220000
+PT BASE_ADDR: 0x0000000000200000
+User L3Entry: va 0x00000000 => page: 0x000A0000
+  VPMIA|USER-RW-> 0x00000000000A0000 (0x00000000000A0743)
+copying at 0xffffffffc0000000
+
+Procwss::new: call UserPageTable::new
+l3[0] addr = 0x290000
+l3[1] addr = 0x2a0000
+PT BASE_ADDR: 0x0000000000280000
+User L3Entry: va 0x00000000 => page: 0x002E0000
+  VPMIA|USER-RW-> 0x00000000002E0000 (0x00000000002E0743)
+copying at 0xffffffffc0000000
+process 1 added
+process 2 added
+            (
+       (      )     )
+         )   (    (
+        (          `
+    .-""^"""^""^"""^""-.
+  (//\\//\\//\\//\\//\\//)
+   ~\^^^^^^^^^^^^^^^^^^/~
+     `================`
+
+    The pi is overdone.
+
+---------- PANIC ----------
+
+FILE: src/traps.rs
+LINE: 60
+COL: 22
+
+Unexpected syndrome Unknown, info: Info { source: LowerAArch64, kind: Synchronous }, esr: 0x2000000, tf: TrapFrame { elr: 18446744072635809792, spsr: 832, sp: 2097152, tpidr: 1, ttbr0: 786432, ttbr1: 2097152, qn: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], xn: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 538312], zero: 0 }
+```
+
+- デバッグ出力を変更
+
+```bash
+KernPageTable:
+  L2Table: 0x000C0000
+    [0]: VT-> 0x000D0000
+    [0]: VT-> 0x000E0000
+  L3Table[0]: 0x000D0000
+    [0]:     VPMIA|KERN-RW-> 0x00000000
+    [1]:     VPMIA|KERN-RW-> 0x00010000
+  L3Table[1]: 0x000E0000
+    [8190]:     VPDOA|KERN-RW-> 0x3FFE0000
+    [8191]:     VPDOA|KERN-RW-> 0x3FFF0000
+
+UserPageTable:
+  L2Table: 0x00200000
+    [0]: VT-> 0x00210000
+  L3Table: 0x00210000
+    VPMIA|USER-RW-> 0x000A0000
+UserPageTable:
+  L2Table: 0x00280000
+    [0]: VT-> 0x00290000
+  L3Table: 0x00290000
+    VPMIA|USER-RW-> 0x002E0000
+
+# GlobalScheduler::start()で`bl context_restore`実行前のトラップフレーム
+
+tf
+  ELR   : 0xFFFFFFFFC0000000
+  SPSR  : 0x00000340
+  SP    : 0x00200000
+  TPIDR : 1
+  TTBR0 : 0x000C0000
+  TTBR1 : 0x00200000
+  x0    : 0x00000000
+  x1    : 0x00000000
+  x2    : 0x00000000
+  x30   : 0x00000000
+
+
+            (
+       (      )     )
+         )   (    (
+        (          `
+    .-""^"""^""^"""^""-.
+  (//\\//\\//\\//\\//\\//)
+   ~\^^^^^^^^^^^^^^^^^^/~
+     `================`
+
+    The pi is overdone.
+
+---------- PANIC ----------
+
+FILE: src/traps.rs
+LINE: 60
+COL: 22
+
+Unexpected syndrome: DataAbort { kind: Translation, level: 0 }
+info: Info { source: CurrentSpElx, kind: Synchronous }
+esr : 0x96000004
+far : 0xAA0803E05281771C   # <= 明らかにおかしい
+tf:
+  ELR   : 0x0008D59C       # <= 値が変わっている
+  SPSR  : 0x200003C5       # <= 値が変わっている
+  SP    : 0x00200000
+  TPIDR : 1
+  TTBR0 : 0x000C0000
+  TTBR1 : 0x00200000
+  x0    : 0x00000000
+  x1    : 0x00096350
+  x2    : 0x00000002
+  x30   : 0x00092D18
+```
+
+- `EC = 0b100101`
+
+例外レベルを変更せずに実行されるデータアボート。
+
+データアクセスによって発生したMMUフォールト、スタックポインタの
+ミスアライメントに起因するもの以外のアライメントフォールト、同期
+パリティエラーやECCエラーを含む同期外部アボートに使用される。
+デバッグ関連の例外には使用されない。
+
+- `DFSC b[5:0] = 0b000100
+
+Translation fault, level 0.
+
+- bin.rsを変えたが一緒だった
+
+```bash
+KernPageTable:
+  L2Table: 0x000A0000
+    [0]: VT-> 0x000B0000
+    [0]: VT-> 0x000C0000
+  L3Table[0]: 0x000B0000
+    [0]:     VPMIA|KERN-RW-> 0x00000000
+    [1]:     VPMIA|KERN-RW-> 0x00010000
+  L3Table[1]: 0x000C0000
+    [8190]:     VPDOA|KERN-RW-> 0x3FFE0000
+    [8191]:     VPDOA|KERN-RW-> 0x3FFF0000
+
+UserPageTable:
+  L2Table: 0x001F0000
+    [0]: VT-> 0x00200000
+  L3Table: 0x00200000
+    VPMIA|USER-RW-> 0x00240000
+UserPageTable:
+  L2Table: 0x00360000
+    [0]: VT-> 0x00370000
+  L3Table: 0x00370000
+    VPMIA|USER-RW-> 0x003B0000
+            (
+       (      )     )
+         )   (    (
+        (          `
+    .-""^"""^""^"""^""-.
+  (//\\//\\//\\//\\//\\//)
+   ~\^^^^^^^^^^^^^^^^^^/~
+     `================`
+
+    The pi is overdone.
+
+---------- PANIC ----------
+
+FILE: src/traps.rs
+LINE: 60
+COL: 22
+
+Unexpected syndrome: DataAbort { kind: Translation, level: 0 }
+info: Info { source: CurrentSpElx, kind: Synchronous }
+esr : 0x96000004
+far : 0xAA0803E05281771C
+tf:
+  ELR   : 0x0008D5F4
+  SPSR  : 0x200003C5
+  SP    : 0x001E0000
+  TPIDR : 1
+  TTBR0 : 0x000A0000
+  TTBR1 : 0x001F0000
+  x0    : 0x00000000
+  x1    : 0x000963B0
+  x2    : 0x00000002
+  x30   : 0x00092D70
+```
+
+```bash
+KernPageTable:
+  L2Table: 0x000C0000
+    [0]: VT-> 0x000D0000
+    [0]: VT-> 0x000E0000
+  L3Table[0]: 0x000D0000
+    [0]:     VPMIA|KERN-RW-> 0x00000000
+    [1]:     VPMIA|KERN-RW-> 0x00010000
+  L3Table[1]: 0x000E0000
+    [8190]:     VPDOA|KERN-RW-> 0x3FFE0000
+    [8191]:     VPDOA|KERN-RW-> 0x3FFF0000
+
+UserPageTable:
+  L2Table: 0x00200000
+    [0]: VT-> 0x00210000
+  L3Table: 0x00210000
+proc1.tf:
+  ELR   : 0xFFFFFFFFC0000000
+  SPSR  : 0x00000340
+  SP    : 0x00200000       # <= これSPのtopで底は0x00100000なので問題なし
+  TPIDR : 0
+  TTBR0 : 0x000C0000
+  TTBR1 : 0x00200000
+  x0    : 0x00000000
+  x1    : 0x00000000
+  x2    : 0x00000000
+  x30   : 0x00000000
+
+    VPMIA|USER-RW-> 0x000A0000
+
+UserPageTable:
+  L2Table: 0x00280000
+    [0]: VT-> 0x00290000
+  L3Table: 0x00290000
+proc2.tf:
+  ELR   : 0xFFFFFFFFC0000000
+  SPSR  : 0x00000340
+  SP    : 0x00400000
+  TPIDR : 0
+  TTBR0 : 0x000C0000
+  TTBR1 : 0x00280000
+  x0    : 0x00000000
+  x1    : 0x00000000
+  x2    : 0x00000000
+  x30   : 0x00000000
+
+    VPMIA|USER-RW-> 0x002E0000
+```
+
+## デバッグモードでビルド
+
+- Makefileにターゲット `build-dev`, `qemu-dev` を追加
+- デバッグ版のカーネルは何も出力されずにだんまり
+
+```bash
+# リリース版
+$ ls -l build
+total 352
+-rwxrwxr-x 1 vagrant vagrant 111336 May 20 14:31 kernel.bin
+-rwxrwxr-x 1 vagrant vagrant 244016 May 20 14:31 kernel.elf
+
+# デバッグ版 -O0
+$ ls -l build
+total 2904
+-rwxrwxr-x 1 vagrant vagrant  369512 May 20 14:20 kernel.bin
+-rwxrwxr-x 1 vagrant vagrant 2599832 May 20 14:20 kernel.elf
+
+# デバッグ版 -O1
+$ ls -l build
+total 2596
+-rwxrwxr-x 1 vagrant vagrant  177736 May 20 14:27 kernel.bin
+-rwxrwxr-x 1 vagrant vagrant 2476168 May 20 14:27 kernel.elf
+```
+
+## リリース版にはデバッグ情報がない
+
+- 以下でgdbでqemuに接続すると`b startup`はできる
+- ただし、デバッグ情報はないので制約あり
+- step実行は突然エラーが発生して原因究明できない
+- si (step instruct)で1命令ずつ追うしかない
+
+```bash
+$ gdb-multiarch build/kernel.elf
+```
+
+- context_saveにブレークポイントをおいて実行
+
+```bash
+─── Stack ──────────────────────────────────────────────────────────────────────────
+[0] from 0x0000000000088000 in context_save
+[1] from 0x0000000000088a14 in vectors
+[2] from 0x00000000000933b8 in core::fmt::write::h79f3df6c660635dc
+[3] from 0x00000000000933b8 in core::fmt::write::h79f3df6c660635dc
+[4] from 0x00000000000933b8 in core::fmt::write::h79f3df6c660635dc
+[5] from 0x00000000000933b8 in core::fmt::write::h79f3df6c660635dc
+[6] from 0x00000000000933b8 in core::fmt::write::h79f3df6c660635dc
+[7] from 0x00000000000933b8 in core::fmt::write::h79f3df6c660635dc
+[8] from 0x00000000000933b8 in core::fmt::write::h79f3df6c660635dc
+[9] from 0x00000000000933b8 in core::fmt::write::h79f3df6c660635dc
+[+]
+─── Threads ────────────────────────────────────────────────────────────────────────
+[4] id 4 from 0x000000000000030c
+[3] id 3 from 0x000000000000030c
+[2] id 2 from 0x000000000000030c
+[1] id 1 from 0x0000000000088000 in context_save
+─── Variables ──────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────────────────
+>>> bt
+#0  0x0000000000088000 in context_save ()
+#1  0x0000000000088a14 in vectors ()
+#2  0x00000000000933b8 in core::fmt::write::h79f3df6c660635dc ()  # h79f3df6c660635dcはmangle
+#3  0x00000000000933b8 in core::fmt::write::h79f3df6c660635dc ()
+   # 933b8:       36000060        tbz     w0, #0, 933c4 <core::fmt::write+0x2d4>
+# これが続いてスタックオーバーフローか?
+#11467 0x00000000000933b8 in core::fmt::write::h79f3df6c660635dc ()
+
+>>> i r FAR_EL1
+FAR_EL1        0xaa0803e05281771c  -6194697025456343268
+>>> i r
+x0             0x0                 0
+x1             0x969f0             616944
+x2             0x2                 2
+x3             0x0                 0
+x4             0x0                 0
+x5             0x0                 0
+x6             0x0                 0
+x7             0x0                 0
+x8             0x969f2             616946
+x9             0xd                 13
+x10            0x969f1             616945
+x11            0x38                56
+x12            0xaa0803e052817708  -6194697025456343288
+x13            0x0                 0
+x14            0x0                 0
+x15            0x0                 0
+x16            0x0                 0
+x17            0x0                 0
+x18            0x0                 0
+x19            0x969f8             616952
+x20            0x1                 1
+x21            0x0                 0
+x22            0x96a08             616968
+x23            0x0                 0
+x24            0x0                 0
+x25            0x0                 0
+x26            0x0                 0
+x27            0x0                 0
+x28            0x0                 0
+x29            0x1                 1
+x30            0x88a14             559636
+sp             0x7ff40             0x7ff40
+pc             0x88000             0x88000 <context_save>
+cpsr           0x3c5               965
+fpsr           0x0                 0
+fpcr           0x0                 0
+MVFR6_EL1_RESERVED 0x0             0
+ESR_EL2        0x0                 0
+MVFR7_EL1_RESERVED 0x0             0
+TPIDR_EL3      0x0                 0
+MAIR_EL3       0x0                 0
+ID_AA64PFR1_EL1 0x0                0
+ID_AA64PFR2_EL1_RESERVED 0x0       0
+AFSR0_EL3      0x0                 0
+ID_AA64PFR3_EL1_RESERVED 0x0       0
+SCTLR          0x30d01805          818944005
+AFSR1_EL3      0x0                 0
+ID_AA64ZFR0_EL1 0x0                0
+DACR32_EL2     0x0                 0
+ID_AA64PFR5_EL1_RESERVED 0x0       0
+CPACR          0x300000            3145728
+CNTKCTL        0x0                 0
+ID_AA64PFR6_EL1_RESERVED 0x0       0
+FPEXC32_EL2    0x0                 0
+ID_AA64PFR7_EL1_RESERVED 0x0       0
+ACTLR_EL1      0x0                 0
+ID_AA64DFR0_EL1 0x10305106         271601926
+AMAIR_EL3      0x0                 0
+ID_AA64DFR1_EL1 0x0                0
+ID_AA64DFR2_EL1_RESERVED 0x0       0
+ESR_EL3        0x0                 0
+ID_AA64DFR3_EL1_RESERVED 0x0       0
+ID_AA64AFR0_EL1 0x0                0
+ID_AA64AFR1_EL1 0x0                0
+ID_AA64AFR2_EL1_RESERVED 0x0       0
+CNTFRQ_EL0     0x3b9aca0           62500000
+ID_AA64AFR3_EL1_RESERVED 0x0       0
+SPSR_EL1       0x200003c5          536871877
+ID_AA64ISAR0_EL1 0x11120           69920
+DBGBVR         0x0                 0
+ELR_EL1        0x8dc3c             580668
+ID_AA64ISAR1_EL1 0x0               0
+FAR_EL2        0x0                 0
+PMEVTYPER0_EL0 0x0                 0
+DBGBCR         0x0                 0
+ID_AA64ISAR2_EL1_RESERVED 0x0      0
+PMEVTYPER1_EL0 0x0                 0
+DBGWVR         0x0                 0
+ID_AA64ISAR3_EL1_RESERVED 0x0      0
+DBGWCR         0x0                 0
+PMEVTYPER2_EL0 0x0                 0
+ID_AA64ISAR4_EL1_RESERVED 0x0      0
+PMEVTYPER3_EL0 0x0                 0
+MDCCSR_EL0     0x0                 0
+ID_AA64ISAR5_EL1_RESERVED 0x0      0
+ID_AA64ISAR6_EL1_RESERVED 0x0      0
+HPFAR_EL2      0x0                 0
+ID_AA64ISAR7_EL1_RESERVED 0x0      0
+CNTVOFF_EL2    0x0                 0
+SP_EL0         0x200000            2097152
+ID_AA64MMFR0_EL1 0x1122            4386
+DBGBVR         0x0                 0
+ID_AA64MMFR1_EL1 0x0               0
+DBGBCR         0x0                 0
+ID_AA64MMFR2_EL1_RESERVED 0x0      0
+PMINTENSET_EL1 0x0                 0
+DBGWVR         0x0                 0
+ID_AA64MMFR3_EL1_RESERVED 0x0      0
+PMINTENCLR_EL1 0x0                 0
+DBGWCR         0x0                 0
+ID_AA64MMFR4_EL1_RESERVED 0x0      0
+SCTLR_EL2      0x0                 0
+PMCNTENSET_EL0 0x0                 0
+PMCR_EL0       0x41002000          1090527232
+ID_AA64MMFR5_EL1_RESERVED 0x0      0
+PMCNTENCLR_EL0 0x0                 0
+FAR_EL3        0x0                 0
+CNTHCTL_EL2    0x3                 3
+ID_AA64MMFR6_EL1_RESERVED 0x0      0
+ACTLR_EL2      0x0                 0
+PMOVSCLR_EL0   0x0                 0
+MDSCR_EL1      0x0                 0
+ID_AA64MMFR7_EL1_RESERVED 0x0      0
+CNTP_CTL_EL0   0x0                 0
+PMSELR_EL0     0x0                 0
+CNTP_CVAL_EL0  0x0                 0
+DBGBVR         0x0                 0
+DBGBCR         0x0                 0
+PMCEID1_EL0    0x0                 0
+PMCEID0_EL0    0x20001             131073
+DBGWVR         0x0                 0
+HCR_EL2        0x80000002          2147483650
+PMCCNTR_EL0    0x0                 0
+DBGWCR         0x0                 0
+MDCR_EL2       0x0                 0
+CPTR_EL2       0x0                 0
+CNTHP_CTL_EL2  0x0                 0
+L2ACTLR        0x0                 0
+HSTR_EL2       0x0                 0
+TTBR0_EL1      0xc0000             786432
+CNTHP_CVAL_EL2 0x0                 0
+SCTLR_EL3      0xc50838            12912696
+TTBR1_EL1      0x200000            2097152
+TCR_EL1        0x2f5227520         12702610720
+ELR_EL2        0x89188             561544
+SPSR_EL2       0x3c5               965
+DBGBVR         0x0                 0
+DBGBCR         0x0                 0
+HACR_EL2       0x0                 0
+VBAR_EL2       0x0                 0
+DBGWVR         0x0                 0
+PMUSERENR_EL0  0x0                 0
+CNTV_CTL_EL0   0x0                 0
+DBGWCR         0x0                 0
+VBAR           0x88800             559104
+ACTLR_EL3      0x0                 0
+CNTV_CVAL_EL0  0x0                 0
+PMOVSSET_EL0   0x0                 0
+SCR_EL3        0x501               1281
+SP_EL1         0x7ff60             524128
+MDRAR_EL1      0x0                 0
+SDER32_EL3     0x0                 0
+PMCCFILTR_EL0  0x0                 0
+DBGBVR         0x0                 0
+CPTR_EL3       0x0                 0
+DBGBCR         0x0                 0
+SPSR_EL3       0x0                 0
+ELR_EL3        0x0                 0
+CPUACTLR_EL1   0x0                 0
+CPUECTLR_EL1   0x0                 0
+VBAR_EL3       0x0                 0
+CONTEXTIDR_EL1 0x0                 0
+CNTPS_CTL_EL1  0x0                 0
+CPUMERRSR_EL1  0x0                 0
+RVBAR_EL3      0x0                 0
+CNTPS_CVAL_EL1 0x0                 0
+L2MERRSR_EL1   0x0                 0
+DBGBVR         0x0                 0
+MAIR_EL1       0x4404ff            4457727
+DBGBCR         0x0                 0
+TPIDR_EL1      0x0                 0
+AFSR0_EL1      0x0                 0
+SP_EL2         0x7fff0             524272
+OSLSR_EL1      0xa                 10
+AFSR1_EL1      0x0                 0
+PAR_EL1        0x0                 0
+CBAR_EL1       0x3f000000          1056964608
+TTBR0_EL2      0x0                 0
+SPSR_IRQ       0x0                 0
+MDCR_EL3       0x0                 0
+TCR_EL2        0x0                 0
+SPSR_ABT       0x0                 0
+FPCR           0x0                 0
+SPSR_UND       0x0                 0
+AMAIR0         0x0                 0
+SPSR_FIQ       0x0                 0
+FPSR           0x0                 0
+ESR_EL1        0x96000004          2516582404
+CLIDR          0xa200023           169869347
+REVIDR_EL1     0x0                 0
+ID_PFR0        0x131               305
+VTTBR_EL2      0x0                 0
+ID_DFR0        0x3010066           50397286
+ID_AFR0        0x0                 0
+VTCR_EL2       0x0                 0
+ID_MMFR0       0x10101105          269488389
+CSSELR         0x0                 0
+ID_MMFR1       0x40000000          1073741824
+TPIDR_EL0      0x1                 1
+AIDR           0x0                 0
+TTBR0_EL3      0x0                 0
+ID_MMFR2       0x1260000           19267584
+TPIDRRO_EL0    0x0                 0
+ID_MMFR3       0x2102211           34611729
+IFSR32_EL2     0x0                 0
+TCR_EL3        0x0                 0
+ID_ISAR0       0x2101110           34607376
+ID_ISAR1       0x13112111          319889681
+PMEVCNTR0_EL0  0x0                 0
+ID_ISAR2       0x21232042          555950146
+PMEVCNTR1_EL0  0x0                 0
+ID_ISAR3       0x1112131           17899825
+CTR_EL0        0x84448004          2219081732
+TPIDR_EL2      0x0                 0
+PMEVCNTR2_EL0  0x0                 0
+ID_ISAR4       0x11142             69954
+PMEVCNTR3_EL0  0x0                 0
+ID_ISAR5       0x11121             69921
+MAIR_EL2       0x0                 0
+ID_MMFR4       0x0                 0
+AFSR0_EL2      0x0                 0
+ID_ISAR6       0x0                 0
+AFSR1_EL2      0x0                 0
+L2CTLR_EL1     0x3000000           50331648
+VPIDR_EL2      0x410fd034          1091555380
+MVFR0_EL1      0x10110222          269550114
+L2ECTLR_EL1    0x0                 0
+FAR_EL1        0xaa0803e05281771c  -6194697025456343268
+MVFR1_EL1      0x12111111          303108369
+MVFR2_EL1      0x43                67
+MVFR3_EL1_RESERVED 0x0             0
+MVFR4_EL1_RESERVED 0x0             0
+AMAIR_EL2      0x0                 0
+MVFR5_EL1_RESERVED 0x0             0
+VMPIDR_EL2     0x80000000          2147483648
+```
+
+## rustcの問題らしい
+
+[Rustでベアメタル(UEFI)するときにprintfデバッグできなくて半年たった話}(https://qiita.com/segfo/items/0a66bdaceab2845e4e1c)に同じような症状が報告されていた。
+
+これによるとリンカオプション`relocate-model=static`にすれば回避できたとのこと。
+
+とりあえず次の修正を行い、カーネルを再コンパイルしたが問題は解決しなかった。
+指定場所が違うのか、このケースに該当しないかさらに要検討。
+
+```diff
+$ git diff kern/.cargo/config
+diff --git a/kern/.cargo/config b/kern/.cargo/config
+index b014ebc..863900c 100644
+--- a/kern/.cargo/config
++++ b/kern/.cargo/config
+@@ -8,6 +8,7 @@ rustflags = [
+     "-C", "link-arg=--script=.cargo/layout.ld",
+     "-C", "link-arg=--no-dynamic-linker",
+     "-C", "link-arg=--no-dynamic-linker",
++    "-C", "relocation-model=static",
+
+     # link to libsd.a
+     "-C", "link-arg=-L.cargo",
+```
+
+```bash
+$ cd kern && make clean && make qemu
+$ make qemu-gdb
++ Building build/kernel.elf [xbuild/build]
+    Finished release [optimized] target(s) in 0.02s
++ Building build/kernel.bin [objcopy]
+./qemu.sh build/kernel.bin -drive file=/home/vagrant/rustos/ext/fat32-imgs/mock1.fat32.img,format=raw,if=sd -s -S
+KernPageTable:
+  L2Table: 0x000C0000
+    [0]: VT-> 0x000D0000
+    [0]: VT-> 0x000E0000
+  L3Table[0]: 0x000D0000
+    [0]: VPMIA|KERN-RW-> 0x00000000
+    [1]: VPMIA|KERN-RW-> 0x00010000
+  L3Table[1]: 0x000E0000
+    [8190]: VPDOA|KERN-RW-> 0x3FFE0000
+    [8191]: VPDOA|KERN-RW-> 0x3FFF0000
+
+UserPageTable:
+  L2Table: 0x00200000
+    [0]: VT-> 0x00210000
+  L3Table: 0x00210000
+    [0]: VPMIA|USER-RW-> 0x000A0000
+UserPageTable:
+  L2Table: 0x00280000
+    [0]: VT-> 0x00290000
+  L3Table: 0x00290000
+    [0]: VPMIA|USER-RW-> 0x002E0000
+            (
+       (      )     )
+         )   (    (
+        (          `
+    .-""^"""^""^"""^""-.
+  (//\\//\\//\\//\\//\\//)
+   ~\^^^^^^^^^^^^^^^^^^/~
+     `================`
+
+    The pi is overdone.
+
+---------- PANIC ----------
+
+FILE: src/traps.rs
+LINE: 60
+COL: 22
+
+Unexpected syndrome: DataAbort { kind: Translation, level: 0 }
+info: Info { source: CurrentSpElx, kind: Synchronous }
+esr : 0x96000004
+far : 0xAA1F03E1580000D4
+tf:
+  ELR   : 0x0008D9BC
+  SPSR  : 0x200003C5
+  SP    : 0x00200000
+  TPIDR : 1
+  TTBR0 : 0x000C0000
+  TTBR1 : 0x00200000
+  x0    : 0x00000000
+  x1    : 0x00096800
+  x2    : 0x00000002
+  x30   : 0x00093130
+```
+
+## とりあえず解決
+
+- いったん`kprint`を全部コメントアウトして動かくか確認 -> 動いた
+- 影響のなさそうな`kprint`からコメントを外して確認 -> 動いた
+- `impl fmt::Debug for KernPageTable`のL3エントリのiteratorを外す -> 動いた
+- teratorを戻す -> 動いた
+- 結局、何もしなかった状態に戻して動いたことになる。原因は不明
+- raspi実機でも動いた
+
+![raspiで実行](images/vm_test.png)
+
+# lab4, フェーズ 4、サブフェーズ A: プログラムのロード
+
+- `Process`構造体から`stack`フィールドを削除
+   （Stack構造体はカーネル上の配列を使っているが今後はページを割り当てるため）
+- `Process::new()`も不要になった
+- ユーザプロセスのスタックのベースアドレスはメモリの最上位アドレスを使うが、
+  `USER_IMG_BASE + USER_MAX_VM_SIZE - 1`とすると`usize`の上限を超えるので
+  `USER_IMG_BASE - 1 + USER_MAX_VM_SIZE`とする。
+- 新規ユーザプロセスの`tf.sp｀は`Process::get_stack_top().as_u64();`であるが
+  これは仮想アドレスなので共通でも構わない。
+- `FILESYSTEM.open(path)`で返されるのは`Entry`なので`File`への変換が必要
+
+## `fs.img`の中身を確認
+
+```bash
+$ cd user
+$ sudo parted fs.img unit B print
+Model:  (file)
+Disk /home/vagrant/rustos/user/fs.img: 128000000B
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags:
+
+Number  Start     End         Size        Type     File system  Flags
+ 1      1048576B  127999999B  126951424B  primary  fat32        lba
+
+$ sudo mount -o loop,offset=1048576,sizelimit=126951424 fs.img /mnt
+$ ls -l /mnt
+total 8
+-rwxr-xr-x 1 root root 6957 May 22 15:48 fib
+-rwxr-xr-x 1 root root   24 May 22 15:48 sleep
+$ sudo umount /mnt
+```
+
+## 実行結果
+
+```bash
+./qemu.sh build/kernel.bin -drive file=/home/vagrant/rustos/user/fs.img,format=raw,if=sd
+TICK, switch from 1 to 2
+TICK, switch from 2 to 3
+TICK, switch from 3 to 4
+TICK, switch from 4 to 1
+TICK, switch from 1 to 2
+QEMU: Terminated
+```
