@@ -54,7 +54,7 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame, far
                     tf.elr += 4;
                 }
                 Syndrome::Svc(n) => {
-                    // kprintln!("Syndrome::Svc({})", n);
+                    //kprintln!("Syndrome::Svc({})", n);
                     handle_syscall(n as u16, tf);
                 }
                 s => panic!("Unexpected syndrome: {:?}\ninfo: {:x?}\nesr : 0x{:08X}\nfar : 0x{:016X}\ntf:\n{:?}", s, info, esr, far, tf),

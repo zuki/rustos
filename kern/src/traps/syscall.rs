@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use core::time::Duration;
 
-use crate::console::CONSOLE;
+use crate::console::{CONSOLE, kprint};
 use crate::process::State;
 use crate::traps::TrapFrame;
 use crate::SCHEDULER;
@@ -12,9 +12,9 @@ use pi::timer::current_time;
 ///
 /// このシステムコールは1つパラメタ: スリープするミリ秒数 を取る.
 ///
-/// In addition to the usual status value, this system call returns one
-/// parameter: the approximate true elapsed time from when `sleep` was called to
-/// when `sleep` returned.
+/// このシステムコールは通常の状態値に加えて次のパラメタを1つ返す:
+///     `sleep`が呼び出されたときから`sleep`が復帰するまでの
+///     おおよその真の経過時間.
 pub fn sys_sleep(ms: u32, tf: &mut TrapFrame) {
     let started = current_time();
     SCHEDULER.switch(
@@ -33,48 +33,54 @@ pub fn sys_sleep(ms: u32, tf: &mut TrapFrame) {
     );
 }
 
-/// Returns current time.
+/// 現在地を返す.
 ///
-/// This system call does not take parameter.
+/// このシステムコールはパラメタを取らない.
 ///
-/// In addition to the usual status value, this system call returns two
-/// parameter:
-///  - current time as seconds
-///  - fractional part of the current time, in nanoseconds.
+/// このシステムコールは通常の状態値に加えて次のパラメタを2つ返す::
+///  - 現在時（秒単位）
+///  - 現在時の分数部分（ナノ秒単位）.
 pub fn sys_time(tf: &mut TrapFrame) {
-    unimplemented!("sys_time()");
+    let now = current_time();
+    tf.xn[0] = now.as_secs();
+    tf.xn[1] = now.subsec_nanos() as u64;
+    tf.xn[7] = OsError::Ok as u64;
 }
 
-/// Kills current process.
+/// カレントプロセスをkillする.
 ///
-/// This system call does not take paramer and does not return any value.
+/// このシステムコールはパラメタを取らず、どのような値も返さない.
 pub fn sys_exit(tf: &mut TrapFrame) {
-    unimplemented!("sys_exit()");
+    let _ = SCHEDULER.kill(tf);
+    let _ = SCHEDULER.switch_to(tf);
 }
 
-/// Write to console.
+/// コンソールに書き出す.
 ///
-/// This system call takes one parameter: a u8 character to print.
+/// このシステムコールはパラメタを1つ受け取る: 出力する u8 文字.
 ///
-/// It only returns the usual status value.
+/// 通常の状態値だけを返す.
 pub fn sys_write(b: u8, tf: &mut TrapFrame) {
-    unimplemented!("sys_write()");
+    kprint!{"{}", b as char};
+    tf.xn[7] = OsError::Ok as u64;
 }
 
-/// Returns current process's ID.
+/// カレントプロセスのIDを返す.
 ///
-/// This system call does not take parameter.
+/// このシステムコールはパラメタを取らない.
 ///
-/// In addition to the usual status value, this system call returns a
-/// parameter: the current process's ID.
+/// このシステムコールは通常の状態値に加えて次のパラメタを1つ返す:
+///     カレントプロセスのID.
 pub fn sys_getpid(tf: &mut TrapFrame) {
-    unimplemented!("sys_getpid()");
+    tf.xn[0] = tf.tpidr;
+    tf.xn[7] = OsError::Ok as u64;
 }
 
 // システムコールを処理する
 pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
     use crate::console::kprintln;
-
+    //kprintln!("handle_syscall: {}", num);
+    //kprintln!("x0: {:X}", tf.xn[0]);
     match num as usize {
         NR_SLEEP => sys_sleep(tf.xn[0] as u32, tf),
         NR_TIME => sys_time(tf),

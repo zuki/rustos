@@ -5,7 +5,7 @@ use core::fmt;
 use aarch64::*;
 
 use crate::mutex::Mutex;
-use crate::param::{PAGE_MASK, PAGE_SIZE, TICK, USER_IMG_BASE};
+use crate::param::{KERN_STACK_BASE, PAGE_MASK, PAGE_SIZE, TICK, USER_IMG_BASE};
 use crate::process::{Id, Process, State};
 use crate::traps::{irq, TrapFrame};
 use crate::VMM;
@@ -81,7 +81,7 @@ impl GlobalScheduler {
                 timer::tick_in(TICK);
                 let old_id = tf.tpidr;
                 let id = SCHEDULER.switch(State::Ready, tf);
-                kprintln!("TICK, switch from {} to {}", old_id, id);
+                //kprintln!("TICK, switch from {} to {}", old_id, id);
             }),
         );
         // タイマー割り込みの有効化
@@ -93,27 +93,21 @@ impl GlobalScheduler {
         self.critical(|scheduler| scheduler.switch_to(&mut tf));
 
         //kprintln!("tf\n{:?}", tf);
-        // spにトラップフレームをセットしてcontext_restore
-        let size: usize = PAGE_SIZE;
-        let mask: usize = 0xFFFF_FFFF_FFFF_FFF0;
+        // 次のページを計算してspにセットする
+        let new_sp = KERN_STACK_BASE + PAGE_SIZE;
         unsafe {
             asm!("mov x0, $0
                   mov sp, x0"
                  :: "r"(tf)
                  :: "volatile");
             asm!("bl context_restore" :::: "volatile");
-            asm!("mov x1, sp
-                  add x1, x1, $0
-                  and x1, x1, $1
-                  mov sp, x1"
-                 :: "r"(size), "r"(mask)
+            asm!("mov x0, $0
+                  mov sp, x0"
+                 :: "i"(new_sp)
                  :: "volatile");
-            asm!("mov x0, xzr
-                  mov x1, xzr
-                  mov lr, xzr"
+            asm!("mov x0, xzr"
                  :::: "volatile");
         }
-        //kprintln!("eret start");
         eret();
         loop {};
     }
@@ -125,7 +119,7 @@ impl GlobalScheduler {
         let mut scheduler = Scheduler::new();
 
         for _ in 0..4 {
-            let p = Process::load("/sleep").expect("load /mnt/sleep.bin");
+            let p = Process::load("/fib").expect("load /fib");
             scheduler.add(p);
         }
 
