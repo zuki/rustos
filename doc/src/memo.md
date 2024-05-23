@@ -2737,3 +2737,49 @@ TICK, switch from 4 to 1
 TICK, switch from 1 to 2
 QEMU: Terminated
 ```
+
+# lab4, フェーズ 4, サブフェーズ B: ユーザプロセス
+
+- 「_start関数のアドレスの代わりに次のページのアドレスを計算してspレジスタに
+   格納してください」の意味がよくわからなかったが以下のようにしたら動いた。
+
+   ```rust
+   let new_sp = KERN_STACK_BASE + PAGE_SIZE;
+   unsafe { asm!("mov x0, $0
+                  mov sp, x0"
+                 :: "i"(new_sp)
+                 :: "volatile"); }
+   ```
+
+- `lib/kernel_api/*`を変更したら`fs.img`を再作成するを忘れていて変更が
+   反映されず時間を取られた。
+- `TICK`を`10ms`に変更したが、それでも`fib(40)`は非常に時間がかかった
+   (QEMUは40秒、実機で18秒かかっている)。最初の項の修正でだんまりになったと
+   思って強制終了したコードもあったが、ひょっとしたら単に実行中だったのかも
+   しれない。
+
+## 実行結果
+
+```bash
+$ make qemu
++ Building build/kernel.elf [xbuild/build]
+    Finished release [optimized] target(s) in 0.02s
++ Building build/kernel.bin [objcopy]
+./qemu.sh build/kernel.bin -drive file=/home/vagrant/rustos/user/fs.img,format=raw,if=sd
+started: 2
+ststarted: 4
+started: 1
+arted: 3
+Result[4] = 165580141
+time[4]: 40131 ms
+Result[2] = 165580141
+time[2]: 40958 ms
+Result[3] = 165580141
+time[3]: 41026 ms
+Result[1] = 165580141
+time[1]: 41001 ms
+```
+
+## ラズパイ実機
+
+![fib](images/fib.png)
