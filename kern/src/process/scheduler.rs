@@ -94,7 +94,7 @@ impl GlobalScheduler {
 
         //kprintln!("tf\n{:?}", tf);
         // 次のページを計算してspにセットする
-        let new_sp = KERN_STACK_BASE + PAGE_SIZE;
+        let new_sp = KERN_STACK_BASE - PAGE_SIZE;
         unsafe {
             asm!("mov x0, $0
                   mov sp, x0"
