@@ -3,15 +3,19 @@ mod syndrome;
 mod syscall;
 
 pub mod irq;
+use core::borrow::BorrowMut;
+
 pub use self::frame::TrapFrame;
+use self::irq::GlobalIrq;
 
 use pi::interrupt::{Controller, Interrupt};
+use pi::local_interrupt::{LocalController, LocalInterrupt};
 
 use self::syndrome::Syndrome;
 use self::syscall::handle_syscall;
-use crate::console::{CONSOLE, kprint, kprintln};
-use crate::IRQ;
-use aarch64::*;
+use crate::percore;
+use crate::traps::irq::IrqHandlerRegistry;
+use crate::GLOABAL_IRQ;
 
 #[repr(u16)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -63,9 +67,9 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame, far
         Kind::Irq => {
             let controller = Controller::new();
             for int in Interrupt::iter() {
-                if controller.is_pending(*int) {
+                if controller.is_pending(int) {
                     //kprintln!("IRQ: {:?}", *int as u32);
-                    IRQ.invoke(*int, tf);
+                    GLOABAL_IRQ.invoke(int, tf);
                 }
             }
         }

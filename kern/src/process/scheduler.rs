@@ -1,23 +1,38 @@
 use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
+use alloc::vec::Vec;
+
+use core::borrow::Borrow;
+use core::ffi::c_void;
 use core::fmt;
+use core::mem;
+use core::time::Duration;
 
 use aarch64::*;
+use pi::local_interrupt::LocalInterrupt;
+use smoltcp::time::Instant;
 
 use crate::mutex::Mutex;
-use crate::param::{KERN_STACK_BASE, PAGE_MASK, PAGE_SIZE, TICK, USER_IMG_BASE};
+use crate::net::uspi::TKernelTimerHandle;
+use crate::param::*;
+use crate::percore::{get_preemptive_counter, is_mmu_ready, local_irq};
 use crate::process::{Id, Process, State};
-use crate::traps::{irq, TrapFrame};
+use crate::traps::irq::GlobalIrq;
+use crate::traps::irq::IrqHandlerRegistry;
+use crate::traps::TrapFrame;
+use crate::{ETHERNET, USB};
+
+use crate::traps::irq;
 use crate::VMM;
-use crate::IRQ;
 use crate::SCHEDULER;
+use crate::GLOABAL_IRQ;
 use crate::console::{kprint, kprintln};
 use pi::timer;
 use pi::interrupt::{Interrupt, Controller};
 
 /// マシン全体用のプロセススケジューラ.
 #[derive(Debug)]
-pub struct GlobalScheduler(Mutex<Option<Scheduler>>);
+pub struct GlobalScheduler(Mutex<Option<Box<Scheduler>>>);
 
 impl GlobalScheduler {
     /// 初期化していないローカルスケジューラのラッパーを返す.
@@ -52,13 +67,27 @@ impl GlobalScheduler {
         self.switch_to(tf)
     }
 
+    /// Loops until it finds the next process to schedule.
+    /// Call `wfi()` in the loop when no process is ready.
+    /// For more details, see the documentation on `Scheduler::switch_to()`.
+    ///
+    /// Returns the process's ID when a ready process is found.
     pub fn switch_to(&self, tf: &mut TrapFrame) -> Id {
         loop {
             let rtn = self.critical(|scheduler| scheduler.switch_to(tf));
             if let Some(id) = rtn {
+                trace!(
+                    "[core-{}] switch_to {:?}, pc: {:x}, lr: {:x}, x29: {:x}, x28: {:x}, x27: {:x}",
+                    affinity(),
+                    id,
+                    tf.elr,
+                    tf.xn[30],
+                    tf.xn[29],
+                    tf.xn[28],
+                    tf.xn[27]
+                );
                 return id;
             }
-            //aarch64::wfe();
             aarch64::wfi();
         }
     }
@@ -74,20 +103,7 @@ impl GlobalScheduler {
     /// 使ってユーザ空間のプロセスの実行を開始する。このメソッドは
     /// 通常の条件では復帰しない。
     pub fn start(&self) -> ! {
-        // タイマー割り込みハンドラの設定
-        IRQ.register(
-            Interrupt::Timer1,
-            Box::new(|tf| {
-                timer::tick_in(TICK);
-                let old_id = tf.tpidr;
-                let id = SCHEDULER.switch(State::Ready, tf);
-                //kprintln!("TICK, switch from {} to {}", old_id, id);
-            }),
-        );
-        // タイマー割り込みの有効化
-        timer::tick_in(TICK);
-        let mut controller = Controller::new();
-        controller.enable(Interrupt::Timer1);
+        self.initialize_global_timer_interrupt();
 
         let mut tf = Box::new(TrapFrame::default());
         self.critical(|scheduler| scheduler.switch_to(&mut tf));
@@ -107,14 +123,51 @@ impl GlobalScheduler {
                  :: "volatile");
             asm!("mov x0, xzr"
                  :::: "volatile");
+            eret();
         }
-        eret();
+
         loop {};
     }
 
 
 
     /// スケジューラを初期化してユーザ空間のプロセスをスケジューラに追加する.
+    /// # Lab 4
+    /// グローバルタイマー割り込みを `pi::timer` で初期化する。タイマーは
+    /// `param.rs` で定義された `TICK` 時間ごとに `Timer1` 割り込みが発生
+    /// するように設定する必要がある。
+    ///
+    /// # Lab 5
+    /// 1 秒後に `poll_ethernet` を起動するタイマーハンドラを
+    /// `Usb::start_kernel_timer` に登録する.
+    pub fn initialize_global_timer_interrupt(&self) {
+        // タイマー割り込みハンドラの設定
+        GLOABAL_IRQ.register(
+            Interrupt::Timer1,
+            Box::new(|tf| {
+                timer::tick_in(TICK);
+                let old_id = tf.tpidr;
+                let id = SCHEDULER.switch(State::Ready, tf);
+                //kprintln!("TICK, switch from {} to {}", old_id, id);
+            }),
+        );
+
+        // タイマー割り込みの有効化
+        timer::tick_in(TICK);
+        let mut controller = Controller::new();
+        controller.enable(Interrupt::Timer1);
+
+    }
+
+    /// Initializes the per-core local timer interrupt with `pi::local_interrupt`.
+    /// The timer should be configured in a way that `CntpnsIrq` interrupt fires
+    /// every `TICK` duration, which is defined in `param.rs`.
+    pub fn initialize_local_timer_interrupt(&self) {
+        // Lab 5 2.C
+        unimplemented!("initialize_local_timer_interrupt()")
+    }
+
+    /// Initializes the scheduler and add userspace processes to the Scheduler.
     pub unsafe fn initialize(&self) {
         let mut scheduler = Scheduler::new();
 
@@ -148,7 +201,14 @@ impl GlobalScheduler {
 
 }
 
-#[derive(Debug)]
+/// Poll the ethernet driver and re-register a timer handler using
+/// `Usb::start_kernel_timer`.
+extern "C" fn poll_ethernet(_: TKernelTimerHandle, _: *mut c_void, _: *mut c_void) {
+    // Lab 5 2.B
+    unimplemented!("poll_ethernet")
+}
+
+/// Internal scheduler struct which is not thread-safe.
 pub struct Scheduler {
     /// プロセスキュー
     processes: VecDeque<Process>,
@@ -158,11 +218,11 @@ pub struct Scheduler {
 
 impl Scheduler {
     /// 空のキューを持つ新しい `Scheduler` を返す.
-    fn new() -> Scheduler {
-        Scheduler {
+    fn new() -> Box<Scheduler> {
+        Box::new(Scheduler {
             processes: VecDeque::<Process>::new(),
             last_id: None,
-        }
+        })
     }
 
     /// プロセスをスケジューラのキューに追加し、新しいプロセスが
@@ -269,6 +329,37 @@ impl Scheduler {
         }
     }
 
+    /// Releases all process resources held by the current process such as sockets.
+    fn release_process_resources(&mut self, tf: &mut TrapFrame) {
+        // Lab 5 2.C
+        unimplemented!("release_process_resources")
+    }
+
+    /// Finds a process corresponding with tpidr saved in a trap frame.
+    /// Panics if the search fails.
+    pub fn find_process(&mut self, tf: &TrapFrame) -> &mut Process {
+        for i in 0..self.processes.len() {
+            if self.processes[i].context.tpidr == tf.tpidr {
+                return &mut self.processes[i];
+            }
+        }
+        panic!("Invalid TrapFrame");
+    }
+}
+
+impl fmt::Debug for Scheduler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let len = self.processes.len();
+        write!(f, "  [Scheduler] {} processes in the queue\n", len)?;
+        for i in 0..len {
+            write!(
+                f,
+                "    queue[{}]: proc({:3})-{:?} \n",
+                i, self.processes[i].context.tpidr, self.processes[i].state
+            )?;
+        }
+        Ok(())
+    }
 }
 
 pub extern "C" fn  test_user_process() -> ! {
@@ -287,31 +378,5 @@ pub extern "C" fn  test_user_process() -> ! {
                  : "x0", "x7"
                  : "volatile");
         }
-    }
-}
-
-pub extern "C" fn start_shell() -> ! {
-    use crate::shell;
-
-    //unsafe { asm!("brk 1" :::: "volatile"); }
-    //unsafe { asm!("brk 2" :::: "volatile"); }
-    //shell::shell("user0> ");
-    //unsafe { asm!("brk 3" :::: "volatile"); }
-    loop {
-        shell::shell("user1> ");
-    }
-}
-
-pub extern "C" fn test_proc_2() -> ! {
-    use crate::shell;
-    loop {
-        shell::shell("user2> ");
-    }
-}
-
-pub extern "C" fn test_proc_3() -> ! {
-    use crate::shell;
-    loop {
-        shell::shell("user3> ");
     }
 }

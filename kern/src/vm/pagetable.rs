@@ -101,7 +101,7 @@ impl L3PageTable {
 #[repr(align(65536))]
 pub struct PageTable {
     pub l2: L2PageTable,
-    pub l3: [L3PageTable; 2],
+    pub l3: [L3PageTable; 3],
 }
 
 impl PageTable {
@@ -110,9 +110,9 @@ impl PageTable {
     fn new(perm: u64) -> Box<PageTable> {
         let mut pt = Box::new(PageTable {
             l2: L2PageTable::new(),
-            l3: [L3PageTable::new(), L3PageTable::new()],
+            l3: [L3PageTable::new(), L3PageTable::new(), L3PageTable::new()],
         });
-        for i in 0..2 {
+        for i in 0..3 {
             let addr = pt.l3[i].as_ptr();
             //kprintln!("l3[{}] addr = 0x{:08X}", i, addr.as_u64());
             let entry = &mut pt.l2.entries[i];
@@ -141,7 +141,7 @@ impl PageTable {
         let l2_index = va.get_value(VirtualAddrEntry::L2INDEX);
         let l3_index = va.get_value(VirtualAddrEntry::L3INDEX);
         let pa = va.get_value(VirtualAddrEntry::PA);
-        if l2_index > 1 {
+        if l2_index > 2 {
             panic!("l2_index > 1: {}", l2_index);
         }
         if pa != 0 {
@@ -345,7 +345,7 @@ impl fmt::Debug for KernPageTable {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "KernPageTable: ")?;
         writeln!(f, "  L2Table: 0x{:08X}", self.0.get_baddr().as_u64())?;
-        for i in 0..2 {
+        for i in 0..3 {
             writeln!(f, "    [0]: {:?}", self.0.l2.entries[i])?;
         }
         writeln!(f, "  L3Table[0]: 0x{:08X}", self.0.l3[0].as_ptr().as_u64())?;
@@ -354,6 +354,9 @@ impl fmt::Debug for KernPageTable {
         writeln!(f, "  L3Table[1]: 0x{:08X}", self.0.l3[1].as_ptr().as_u64())?;
         writeln!(f, "    [8190]: {:?}", self.0.l3[1].entries[8190].0)?;
         writeln!(f, "    [8191]: {:?}", self.0.l3[1].entries[8191].0)?;
+        writeln!(f, "  L3Table[2]: 0x{:08X}", self.0.l3[2].as_ptr().as_u64())?;
+        writeln!(f, "    [0]: {:?}", self.0.l3[2].entries[0].0)?;
+        writeln!(f, "    [1]: {:?}", self.0.l3[2].entries[1].0)?;
         Ok(())
     }
 }

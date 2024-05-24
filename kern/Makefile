@@ -30,6 +30,13 @@ build-dev:
 
 	@echo "+ Building build/$(KERN).bin [objcopy]"
 	@$(OBJCPY) $(TARGET-DEV) build/$(KERN).bin
+build-all:
+	@(cd ../ext/uspi/lib; make)
+	cp -f ../ext/uspi/lib/libuspi.a ./.cargo/
+	@(cd ../ext/uspi/env/lib; make)
+	cp -f ../ext/uspi/env/lib/libuspienv.a ./.cargo/
+	touch src/main.rs
+	make build
 
 check:
 	@cargo xcheck

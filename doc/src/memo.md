@@ -2807,3 +2807,28 @@ time[1]: 41001 ms
 0x0000_0000_0400_0000 -----------------
                          ローダ
 ```
+
+# Lab 5: マージ作業
+
+- 割り込み関係が大きく変わり、マージコンフリクトの解消だけでなく
+  変更点の修正も必要だった。
+
+## マージ後の実行出力
+
+```bash
+./qemu.sh build/kernel.bin -drive file=/home/vagrant/rustos/user/fs.img,format=raw,if=sd
+[INFO] text beg: 0000000000080000, end: 000000000009a418
+[INFO] bss  beg: 000000000009a3e0, end: 000000000009a418
+started: 1
+started: 2
+started: 3
+started: 4
+Result[1] = 165580141
+time[1]: 34067 ms
+Result[3] = 165580141
+time[3]: 31947 ms
+Result[2] = 165580141
+time[2]: 36326 ms
+Result[4] = 165580141
+time[4]: 33604 ms
+```

@@ -1,11 +1,13 @@
 #![feature(new_uninit)]
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::mem;
 use shim::io;
 use shim::path::Path;
 use fat32::traits::{Entry, File, FileSystem};
 
 use aarch64::*;
+use smoltcp::socket::SocketHandle;
 
 use crate::{param::*, FILESYSTEM};
 use crate::process::{Stack, State};
@@ -31,6 +33,9 @@ pub struct Process {
     pub vmap: Box<UserPageTable>,
     /// プロセスのスケジューリング状態.
     pub state: State,
+    // Lab 5 2.C
+    // Socket handles held by the current process
+    // pub sockets: Vec<SocketHandle>,
 }
 
 impl Process {

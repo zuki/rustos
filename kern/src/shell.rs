@@ -8,7 +8,6 @@ use core::str;
 use core::time::Duration;
 
 use pi::atags::Atags;
-use kernel_api::syscall::sleep;
 
 use fat32::traits::FileSystem;
 use fat32::traits::{Dir, Entry, File};
@@ -150,6 +149,7 @@ fn do_cat(path: &PathBuf)  {
     }
 }
 
+/*
 fn do_sleep(ms: &str) {
     use core::str::FromStr;
 
@@ -163,6 +163,7 @@ fn do_sleep(ms: &str) {
         Err(_) => kprintln!("span is not number"),
     }
 }
+*/
 
 /// 各行のプリフィックスとして`prefix`を使ってシェルを開始する。
 /// `exit`コマンドが呼び出されたらこの関数はリターンする。
@@ -237,6 +238,7 @@ pub fn shell(prefix: &str) -> () {
                                     _ => kprintln!("too many args"),
                                 }
                             }
+                    /*
                             &"sleep" => {
                                 kprint!("\n");
                                 match command.args.len() {
@@ -245,6 +247,7 @@ pub fn shell(prefix: &str) -> () {
                                     _ => kprintln!("too many args"),
                                 }
                             }
+                    */
                             &"exit" => {
                                 kprintln!("\nexit shell.");
                                 return;

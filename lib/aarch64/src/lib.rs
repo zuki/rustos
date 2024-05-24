@@ -21,8 +21,8 @@ pub use asm::*;
 /// # Safety
 /// This function should only be called when EL is >= 1.
 #[inline(always)]
-pub unsafe fn current_el() -> u8 {
-    ((CurrentEL.get() & 0b1100) >> 2) as u8
+pub fn current_el() -> u8 {
+    ((unsafe { CurrentEL.get() } & 0b1100) >> 2) as u8
 }
 
 /// Returns the SPSel value.
