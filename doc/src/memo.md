@@ -2832,3 +2832,48 @@ time[2]: 36326 ms
 Result[4] = 165580141
 time[4]: 33604 ms
 ```
+
+# Lab 5, フェース 1: マルチコアの有効化, サブフェース A: 他のコアを起床させる
+
+- `SPINNING_BASE`は`*mut usize`型で加算は`add()`を使う。`+`では型が合わないエラーが頻出。足すのはusizeバイト単位（バイト数ではない）
+- 物理アドレスの読み書きは`write_volatile()`, `read_volatile()`を使う
+- SP変数というのは`aarch64::SP`のことのようだ
+- 特殊レジスタの読み書きは`レジスタ名.get_value(フィールド名)`を使える
+
+```rust
+pub unsafe fn initialize_app_cores() {
+    for core in 1..NCORES {
+        let spinning = SPINNING_BASE.add(core);
+        spinning.write_volatile(start2 as usize);
+    }
+...
+pub unsafe extern "C" fn start2() -> ! {
+    let core = MPIDR_EL1.get_value(MPIDR_EL1::Aff0);
+    let stack =  KERN_STACK_BASE - KERN_STACK_SIZE * core as usize;
+    asm!("mov sp, $0"
+         :: "r"(stack) :: "volatile");
+```
+
+## 実行画面
+
+```bash
+$ make qemu
+./qemu.sh build/kernel.bin -drive file=/home/vagrant/rustos/user/fs.img,format=raw,if=sd
+[INFO] text beg: 0000000000080000, end: 000000000009a878
+[INFO] bss  beg: 000000000009a840, end: 000000000009a878
+[INFO] core 1 started
+[INFO] core 3 started
+[INFO] core 2 started
+started: 1
+started: 2
+started: 3
+started: 4
+Result[3] = 165580141
+Result[4] = 165580141
+time[4]: 34168 ms
+Result[1] = 165580141
+time[1]: 40474 ms
+Result[2] = 165580141
+time[2]: 38438 ms
+time[3]: 36414 ms
+```
