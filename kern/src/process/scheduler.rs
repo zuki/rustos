@@ -110,19 +110,21 @@ impl GlobalScheduler {
 
         //kprintln!("tf\n{:?}", tf);
         // 次のページを計算してspにセットする
-        let new_sp = KERN_STACK_BASE - PAGE_SIZE;
+        let _new_sp = KERN_STACK_BASE - PAGE_SIZE;
         unsafe {
             asm!("mov x0, $0
                   mov sp, x0"
                  :: "r"(tf)
                  :: "volatile");
             asm!("bl context_restore" :::: "volatile");
+        /*
             asm!("mov x0, $0
                   mov sp, x0"
                  :: "i"(new_sp)
                  :: "volatile");
             asm!("mov x0, xzr"
                  :::: "volatile");
+        */
             eret();
         }
 

@@ -18,8 +18,8 @@ pub fn nop() {
 
 /// Transition to a lower level
 #[inline(always)]
-pub unsafe fn eret() {
-    asm!("eret" :::: "volatile");
+pub fn eret() {
+    unsafe { asm!("eret" :::: "volatile") };
 }
 
 /// Instruction Synchronization Barrier

@@ -70,8 +70,11 @@ unsafe fn kmain() -> ! {
     ALLOCATOR.initialize();
     FILESYSTEM.initialize();
     VMM.initialize();
-    VMM.setup();
     SCHEDULER.initialize();
+
+    init::initialize_app_cores();
+
+    VMM.setup();
     SCHEDULER.start();
 
     info!("Welcome to cs3210!");

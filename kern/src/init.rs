@@ -1,7 +1,7 @@
 use aarch64::*;
 
 use core::mem::zeroed;
-use core::ptr::write_volatile;
+use core::ptr::{write_volatile, read_volatile};
 
 mod oom;
 mod panic;
@@ -9,18 +9,20 @@ mod panic;
 use crate::kmain;
 use crate::param::*;
 use crate::VMM;
+use pi::common::SPINNING_BASE;
 
 global_asm!(include_str!("init/vectors.s"));
 
 //
-// big assumptions (better to be checked):
-//   _start1/2(), _kinit1/2(), switch_to_el1/2() should NOT use stack!
-//   e.g., #[no_stack] would be useful ..
+// 大前提 (チェックすること):
+//   _start1/2(), _kinit1/2(), switch_to_el1/2() は
+//     スタックを使ってあいけないshould NOT use stack!
+//   例えば, #[no_stack] が便利だろう ..
 //
-// so, no debug build support!
+// そのため、debugビルドはサポートしていない!
 //
 
-/// Kernel entrypoint for core 0
+/// コア0のカーネルエントリポイント
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
     if MPIDR_EL1.get_value(MPIDR_EL1::Aff0) == 0 {
@@ -48,14 +50,14 @@ unsafe fn zeros_bss() {
 #[no_mangle]
 unsafe fn switch_to_el2() {
     if current_el() == 3 {
-        // set up Secure Configuration Register (D13.2.10)
+        // ソース制御レジスタ (SCR_EL3) の設定 (D13.2.10)
         SCR_EL3.set(SCR_EL3::NS | SCR_EL3::SMD | SCR_EL3::HCE | SCR_EL3::RW | SCR_EL3::RES1);
 
-        // set up Saved Program Status Register (C5.2.19)
+        // 保存プログラムステータスレジスタ (SPSR_EL3) の設定 (C5.2.19)
         SPSR_EL3
             .set((SPSR_EL3::M & 0b1001) | SPSR_EL3::F | SPSR_EL3::I | SPSR_EL3::A | SPSR_EL3::D);
 
-        // eret to itself, expecting current_el() == 2 this time.
+        // 自分指針にeret, これにより current_el() == 2 となる.
         ELR_EL3.set(switch_to_el2 as u64);
         asm::eret();
     }
@@ -68,29 +70,29 @@ unsafe fn switch_to_el1() {
     }
 
     if current_el() == 2 {
-        // set the stack-pointer for EL1
+        // EL1のスタックポインタを設定
         SP_EL1.set(SP.get() as u64);
 
-        // enable CNTP for EL1/EL0 (ref: D7.5.2, D7.5.13)
-        // NOTE: This doesn't actually enable the counter stream.
+        // EL1/EL0 でCNTPを有効化 (ref: D7.5.2, D7.5.13)
+        // 注: これは実際にはカウンタストリームを有効にしない.
         CNTHCTL_EL2.set(CNTHCTL_EL2.get() | CNTHCTL_EL2::EL0VCTEN | CNTHCTL_EL2::EL0PCTEN);
         CNTVOFF_EL2.set(0);
 
-        // enable AArch64 in EL1 (A53: 4.3.36)
+        // EL1でAArch64を有効化 (A53: 4.3.36)
         HCR_EL2.set(HCR_EL2::RW | HCR_EL2::RES1);
 
-        // enable floating point and SVE (SIMD) (A53: 4.3.38, 4.3.34)
+        // 浮動小数点数とSVE (SIMD) を有効化 (A53: 4.3.38, 4.3.34)
         CPTR_EL2.set(0);
         CPACR_EL1.set(CPACR_EL1.get() | (0b11 << 20));
 
-        // Set SCTLR to known state (A53: 4.3.30)
+        // SCTRLを既知の状態に設定 (A53: 4.3.30)
         SCTLR_EL1.set(SCTLR_EL1::RES1);
 
-        // set up exception handlers
-        // FIXME: load `vectors` addr into appropriate register (guide: 10.4)
+        // 例外ハンドラを設定
+        // `vectors`のアドレスを適切なレジスタにロードする (guide: 10.4)
         VBAR_EL1.set(&vectors as *const u64 as u64);
 
-        // change execution level to EL1 (ref: C5.2.19)
+        // 例外レベルをEL1に変更する (ref: C5.2.19)
         SPSR_EL2.set(
             (SPSR_EL2::M & 0b0101) // EL1h
             | SPSR_EL2::F
@@ -99,7 +101,7 @@ unsafe fn switch_to_el1() {
             | SPSR_EL2::A,
         );
 
-        // FIXME: eret to itself, expecting current_el() == 1 this time
+        // 自分自身にeretする。これにより current_el() == 1 となる
         ELR_EL2.set(switch_to_el1 as u64);
         asm::eret();
     }
@@ -113,11 +115,15 @@ unsafe fn kinit() -> ! {
     kmain();
 }
 
-/// Kernel entrypoint for core 1, 2, and 3
+/// コア 1, 2, 3 のカーネルエントリポイント
 #[no_mangle]
 pub unsafe extern "C" fn start2() -> ! {
     // Lab 5 1.A
-    unimplemented!("start2")
+    let core = MPIDR_EL1.get_value(MPIDR_EL1::Aff0);
+    let stack =  KERN_STACK_BASE - KERN_STACK_SIZE * core as usize;
+    asm!("mov sp, $0"
+         :: "r"(stack) :: "volatile");
+    kinit2();
 }
 
 unsafe fn kinit2() -> ! {
@@ -128,12 +134,28 @@ unsafe fn kinit2() -> ! {
 
 unsafe fn kmain2() -> ! {
     // Lab 5 1.A
-    unimplemented!("kmain2")
+    let core = MPIDR_EL1.get_value(MPIDR_EL1::Aff0);
+    let spinning = SPINNING_BASE.add(core as usize);
+    spinning.write_volatile(0);
+    info!("core {} started", core);
+
+    loop {}
 }
 
-/// Wakes up each app core by writing the address of `init::start2`
-/// to their spinning base and send event with `sev()`.
+/// `init::start2` のアドレスを各自のスピニングアドレスに
+/// 書き込むことによりappコアを起床させ、`sev()`でイベントを
+/// 送信する.
 pub unsafe fn initialize_app_cores() {
     // Lab 5 1.A
-    unimplemented!("initialize_app_cores")
+    for core in 1..NCORES {
+        let spinning = SPINNING_BASE.add(core);
+        spinning.write_volatile(start2 as usize);
+    }
+
+    asm::sev();
+
+    for core in 1..NCORES {
+        let spinning = SPINNING_BASE.add(core);
+        while spinning.read_volatile() != 0 {}
+    }
 }
