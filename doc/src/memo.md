@@ -2877,3 +2877,78 @@ Result[2] = 165580141
 time[2]: 38438 ms
 time[3]: 36414 ms
 ```
+# Lab 5, フェース 1: マルチコアの有効化, サブフェース B: Mutex再び
+
+## 実行結果
+
+```bash
+# プロセスを4個実行
+
+./qemu.sh build/kernel.bin -drive file=/home/vagrant/rustos/user/fs.img,format=raw,if=sd
+[INFO] text beg: 0000000000080000, end: 000000000009bd38
+[INFO] bss  beg: 000000000009bd00, end: 000000000009bd38
+[INFO] MMU is ready for core-1/@sp=000000000006ff20
+[INFO] MMU is ready for core-3/@sp=000000000004ff20
+[INFO] MMU is ready for core-2/@sp=000000000005ff20
+[INFO] MMU is ready for core-0/@sp=000000000007fef0
+[INFO] core 1 started
+[01] Started: 107.556ms
+[01] Ended: 116.342ms
+[INFO] core 2 started
+[01] fib(20) = 10946 (8.786ms)
+[02] Started: 128.912ms
+[02] Ended: 135.614ms
+[02] fib(20) = 10946 (6.702ms)
+[03] Started: 139.732ms
+[03] Ended: 163.219ms
+[03] fib(20) = 10946 (23.487ms)
+[04] Started: 169.768ms
+[04] Ended: 176.984ms
+[04] fib(20) = 10946 (7.216ms)
+[INFO] core 3 started
+QEMU: Terminated
+
+# プロセスを10個実行
+
+./qemu.sh build/kernel.bin -drive file=/home/vagrant/rustos/user/fs.img,format=raw,if=sd
+[INFO] text beg: 0000000000080000, end: 000000000009bd38
+[INFO] bss  beg: 000000000009bd00, end: 000000000009bd38
+[INFO] MMU is ready for core-3/@sp=000000000004ff20
+[INFO] MMU is ready for core-2/@sp=000000000005ff20
+[INFO] MMU is ready for core-1/@sp=000000000006ff20
+[INFO] MMU is ready for core-0/@sp=000000000007fef0
+[INFO] core 1 started
+[INFO] core 2 started
+[INFO] core 3 started
+[01] Started: 106.457ms
+[01] Ended: 149.365ms
+[01] fib(20) = 10946 (42.908ms)
+[02] Started: 174.265ms
+[02] Ended: 180.81ms
+[02] fib(20) = 10946 (6.545ms)
+[03] Started: 206.638ms
+[03] Ended: 217.626ms
+[03] fib(20) = 10946 (10.988ms)
+[04] Started: 238.181ms
+[04] Ended: 243.737ms
+[04] fib(20) = 10946 (5.556ms)
+[05] Started: 265.501ms
+[05] Ended: 278.421ms
+[05] fib(20) = 10946 (12.92ms)
+[06] Started: 305.476ms
+[06] Ended: 318.059ms
+[06] fib(20) = 10946 (12.583ms)
+[07] Started: 340.241ms
+[07] Ended: 346.752ms
+[07] fib(20) = 10946 (6.511ms)
+[08] Started: 378.064ms
+[08] Ended: 386.479ms
+[08] fib(20) = 10946 (8.415ms)
+[09] Started: 402.061ms
+[09] Ended: 425.474ms
+[09] fib(20) = 10946 (23.413ms)
+[10] Started: 437.057ms
+[10] Ended: 449.415ms
+[10] fib(20) = 10946 (12.358ms)
+QEMU: Terminated
+```
