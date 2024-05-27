@@ -5,6 +5,7 @@ pub use self::address::{PhysicalAddr, VirtualAddr};
 pub use self::pagetable::*;
 
 use aarch64::*;
+use pi::common::NCORES;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::mutex::Mutex;
@@ -12,8 +13,11 @@ use crate::param::{KERNEL_MASK_BITS, USER_MASK_BITS};
 use crate::percore::{is_mmu_ready, set_mmu_ready};
 
 pub struct VMManager {
+    /// カーネルページテーブル
     kern_pt: Mutex<Option<KernPageTable>>,
+    /// カーネルページテーブルのベースアドレス
     kern_pt_addr: AtomicUsize,
+    /// MMU初期化済みのコアの数
     ready_core_cnt: AtomicUsize,
 }
 
@@ -41,14 +45,16 @@ impl VMManager {
         *(self.kern_pt.lock()) = Some(kern_pt);
     }
 
-    /// 仮想メモリマネージャを設定するr.
+    /// 仮想メモリマネージャを設定する.
     /// callerはこの関数を呼ぶ前にかならず `initialize()` を
     /// 呼び出していなければならない.
-    /// MAIR_EL1, TCR_EL1, TTBR0_EL1, TTBR1_EL1 の各レジスタに適切な設定フラグをセットする。
+    /// MAIR_EL1, TCR_EL1, TTBR0_EL1, TTBR1_EL1 の各レジスタに適切な
+    /// 設定フラグをセットする。
     ///
     /// # パニック
     ///
-    /// Panics if the current system does not support 64KB memory translation granule size.
+    /// カレントシステムが64KBのメモリ翻訳粒度サイズをサポートして
+    /// いない場合はパニックになる.
     pub unsafe fn setup(&self) {
         assert!(ID_AA64MMFR0_EL1.get_value(ID_AA64MMFR0_EL1::TGran64) == 0);
 
@@ -93,12 +99,12 @@ impl VMManager {
         SCTLR_EL1.set(SCTLR_EL1.get() | SCTLR_EL1::I | SCTLR_EL1::C | SCTLR_EL1::M);
         asm!("dsb sy");
         isb();
-
+        // このコアでMMUの初期化がすんだことを記録する
         set_mmu_ready();
     }
 
-    /// Setup MMU for the current core.
-    /// Wait until all cores initialize their MMU.
+    /// カレントコアのMMUを設定する.
+    /// すべてのコアが各自のMMUを初期化するまで待機する.
     pub fn wait(&self) {
         assert!(!is_mmu_ready());
 
@@ -109,7 +115,10 @@ impl VMManager {
         info!("MMU is ready for core-{}/@sp={:016x}", affinity(), SP.get());
 
         // Lab 5 1.B
-        unimplemented!("wait for other cores")
+        // MMU初期化済みのコア数をインクルメント
+        self.ready_core_cnt.fetch_add(1, Ordering::SeqCst);
+        // すべてのコアがMMUの初期化を終えるのを待機する
+        while self.ready_core_cnt.load(Ordering::SeqCst) != NCORES {}
     }
 
     /// カーネルページテーブルのベースアドレスを `PhysicalAddrP` として返す.

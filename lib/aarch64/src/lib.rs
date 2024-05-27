@@ -16,16 +16,17 @@ pub use regs::*;
 pub use vmsa::*;
 pub use asm::*;
 
-/// Returns the current exception level.
+/// 現在の例外レベルを返す.
 ///
-/// # Safety
-/// This function should only be called when EL is >= 1.
+/// # 安全性
+///
+/// この関数はEL >= 1 の時にしか呼び出すことはできない.
 #[inline(always)]
 pub fn current_el() -> u8 {
     ((unsafe { CurrentEL.get() } & 0b1100) >> 2) as u8
 }
 
-/// Returns the SPSel value.
+/// SPSel値を返す.
 #[inline(always)]
 pub fn sp_sel() -> u8 {
     unsafe {
@@ -33,11 +34,11 @@ pub fn sp_sel() -> u8 {
     }
 }
 
-/// Returns the core currently executing.
+/// 現在実行中のコアを返す.
 ///
-/// # Safety
+/// # 安全性
 ///
-/// This function should only be called when EL is >= 1.
+/// この関数はEL >= 1 の時にしか呼び出すことはできない.
 pub fn affinity() -> usize {
     unsafe {
         MPIDR_EL1.get_value(MPIDR_EL1::Aff0) as usize
