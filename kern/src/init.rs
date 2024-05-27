@@ -137,9 +137,12 @@ unsafe fn kmain2() -> ! {
     let core = MPIDR_EL1.get_value(MPIDR_EL1::Aff0);
     let spinning = SPINNING_BASE.add(core as usize);
     spinning.write_volatile(0);
+    VMM.wait();
     info!("core {} started", core);
 
-    loop {}
+    loop {
+        //info!("core {} looping", core);
+    }
 }
 
 /// `init::start2` のアドレスを各自のスピニングアドレスに

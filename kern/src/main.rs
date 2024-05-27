@@ -73,10 +73,10 @@ unsafe fn kmain() -> ! {
     SCHEDULER.initialize();
 
     init::initialize_app_cores();
-
-    VMM.setup();
+    VMM.wait();
     SCHEDULER.start();
-
+/*
     info!("Welcome to cs3210!");
     shell::shell("> ");
+*/
 }
