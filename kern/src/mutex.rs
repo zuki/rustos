@@ -2,6 +2,9 @@ use core::cell::UnsafeCell;
 use core::fmt;
 use core::ops::{Deref, DerefMut, Drop};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use aarch64::affinity;
+
+use crate::percore::{self, is_mmu_ready};
 
 #[repr(align(32))]
 pub struct Mutex<T> {
@@ -31,21 +34,25 @@ impl<T> Mutex<T> {
 }
 
 impl<T> Mutex<T> {
-    // MMU/キャッシュが有効になったら、ここで正しいことをする。
-    // 現時点では本当の同期は必要ない。
     pub fn try_lock(&self) -> Option<MutexGuard<T>> {
-        let this = 0;
-        if !self.lock.load(Ordering::Relaxed) || self.owner.load(Ordering::Relaxed) == this {
-            self.lock.store(true, Ordering::Relaxed);
-            self.owner.store(this, Ordering::Relaxed);
-            Some(MutexGuard { lock: &self })
+        if percore::is_mmu_ready() {
+            if !self.lock.compare_and_swap(false, true, Ordering::SeqCst) {
+                self.owner.store(percore::getcpu(), Ordering::SeqCst);
+                Some(MutexGuard { lock: &self })
+            } else {
+                None
+            }
         } else {
-            None
+            if !self.lock.load(Ordering::Relaxed) {
+                self.lock.store(true, Ordering::Relaxed);
+                self.owner.store(percore::getcpu(), Ordering::Relaxed);
+                Some(MutexGuard { lock: &self })
+            } else {
+                None
+            }
         }
     }
 
-    // MMU/キャッシュが有効になったら、ここで正しいことをする。
-    // 現時点では本当の同期は必要ない。
     #[inline(never)]
     pub fn lock(&self) -> MutexGuard<T> {
         // lockを「取得」できるまで待機して「取得」する.
@@ -58,8 +65,19 @@ impl<T> Mutex<T> {
     }
 
     fn unlock(&self) {
-        self.lock.store(false, Ordering::Relaxed);
+        if percore::is_mmu_ready() {
+            let core = affinity();
+            if self.owner.load(Ordering::Acquire) == core {
+                self.owner.store(usize::max_value(), Ordering::Release);
+                self.lock.store(false, Ordering::SeqCst);
+                percore::putcpu(core);
+            }
+        } else {
+            self.lock.store(false, Ordering::Relaxed);
+            percore::putcpu(0);
+        }
     }
+
 }
 
 impl<'a, T: 'a> Deref for MutexGuard<'a, T> {
