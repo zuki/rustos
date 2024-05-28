@@ -73,8 +73,8 @@ impl<T> Mutex<T> {
                 percore::putcpu(core);
             }
         } else {
-            self.lock.store(false, Ordering::Relaxed);
             self.owner.store(usize::max_value(), Ordering::Relaxed);
+            self.lock.store(false, Ordering::Relaxed);
             percore::putcpu(0);
         }
     }
