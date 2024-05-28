@@ -2952,3 +2952,52 @@ QEMU: Terminated
 [10] fib(20) = 10946 (12.358ms)
 QEMU: Terminated
 ```
+
+## `TICK`を10ミリ秒するとエラー発生
+
+- 2秒や100ミリ秒では発生せず
+
+```bash
+[INFO] text beg: 0000000000080000, end: 000000000009bd38
+[INFO] bss  beg: 000000000009bd00, end: 000000000009bd38
+[INFO] MMU is ready for core-3/@sp=000000000004ff20
+[INFO] MMU is ready for core-1/@sp=000000000006ff20
+[INFO] MMU is ready for core-2/@sp=000000000005ff20
+[INFO] MMU is ready for core-0/@sp=000000000007fef0
+[INFO] core 3 started
+[01] Started: 139.798[INFO] core 1 started
+            (
+       (      )     )
+         )   (    (
+        (          `
+    .-""^"""^""^"""^""-.
+  (//\\//\\//\\//\\//\\//)
+   ~\^^^^^^^^^^^^^^^^^^/~
+     `================`
+
+    The pi is overdone.
+
+---------- PANIC ----------
+
+FILE: src/traps.rs
+LINE: 64
+COL: 22
+
+Unexpected syndrome: InstructionAbort { kind: Translation, level: 2 }
+info: Info { source: CurrentSpElx, kind: Synchronous }
+esr : 0x86000006
+far : 0x0000000060000340      # <= カーネルメモリ外 (0x80000340のこともあり)
+tf:
+  ELR   : 0x60000340          # <= このELRが
+  SPSR  : 0x800003C5
+  SP    : 0xFFFFFFFFFFFFFDB0
+  TPIDR : 1
+  TTBR0 : 0x000C0000
+  TTBR1 : 0x00100000
+  x0    : 0x00000002
+  x1    : 0x00000000
+  x7    : 0x00000001
+  x30   : 0x60000340          # <= ここに設定され、復帰時にメモリ外で翻訳エラー
+
+[INFO] core 2 started
+```
