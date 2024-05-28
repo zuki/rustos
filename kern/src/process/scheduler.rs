@@ -108,7 +108,7 @@ impl GlobalScheduler {
         let mut tf = Box::new(TrapFrame::default());
         self.critical(|scheduler| scheduler.switch_to(&mut tf));
 
-        //kprintln!("tf\n{:?}", tf);
+        debug!("start: tf\n{:?}", tf);
         // 次のページを計算してspにセットする
         let _new_sp = KERN_STACK_BASE - PAGE_SIZE;
         unsafe {
@@ -150,7 +150,7 @@ impl GlobalScheduler {
                 timer::tick_in(TICK);
                 let old_id = tf.tpidr;
                 let id = SCHEDULER.switch(State::Ready, tf);
-                //kprintln!("TICK, switch from {} to {}", old_id, id);
+                trace!("TICK, switch from {} to {}", old_id, id);
             }),
         );
 
@@ -288,12 +288,12 @@ impl Scheduler {
         if index == self.processes.len() {
             return None;
         }
-        //kprintln!("sw_to_before.tf\n{:?}", &tf);
+        trace!("sw_to_before.tf\n{:?}", &tf);
         let mut process = self.processes.remove(index).unwrap();
         process.state = State::Ready;
         *tf = *process.context;
         let id = process.context.tpidr;
-        //kprintln!("sw_to_after.tf\n{:?}", &tf);
+        trace!("sw_to_after.tf\n{:?}", &tf);
         self.processes.push_front(process);
         Some(id)
     }
@@ -337,8 +337,8 @@ impl Scheduler {
         unimplemented!("release_process_resources")
     }
 
-    /// Finds a process corresponding with tpidr saved in a trap frame.
-    /// Panics if the search fails.
+    /// トラップフレームに保存されているtpidrに対応するプロセスを見つけつ.
+    /// 検索に失敗したらパニック.
     pub fn find_process(&mut self, tf: &TrapFrame) -> &mut Process {
         for i in 0..self.processes.len() {
             if self.processes[i].context.tpidr == tf.tpidr {
