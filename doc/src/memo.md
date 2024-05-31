@@ -3001,3 +3001,214 @@ tf:
 
 [INFO] core 2 started
 ```
+
+# Lab 5, Phase 1, SubPhase C
+
+```bash
+./qemu.sh build/kernel.bin -drive file=/home/vagrant/rustos/user/fs.img,format=raw,if=sd
+[INFO] text beg: 0000000000080000, end: 000000000009caf8
+[INFO] bss  beg: 000000000009cac0, end: 000000000009caf8
+[INFO] MMU is ready for core-3/@sp=000000000004ff20
+[INFO] MMU is ready for core-1/@sp=000000000006ff20
+[INFO] MMU is ready for core-2/@sp=000000000005ff20
+[INFO] MMU is ready for core-0/@sp=000000000007fef0
+[INFO] core 2 started
+[INFO] core 1 started
+[INFO] core 3 started
+[DEBUG] invoke 1
+[DEBUG] invoke 1
+[DEBUG] invoke 1
+[[02] Started: [03] Started: 188.[DEBUG] invoke 1
+[DEBUG] invoke 1
+[DEBUG] invoke 1
+0[DEBUG] invoke 1
+[[03] Started: 2030.4331ms] Started: [04
++205.            (
+[       (      )     )
+0         )   (    (
+        (          `
+[DEBUG] invoke 1
+    .-""^"""^""^"""^""-.
+[  (//\\//\\//\\//\\//\\//)
+   ~\^^^^^^^^^^^^^^^^^^/~
+0     `================`
+1
+    The pi is overdone.
+] Started:
+---------- PANIC ----------
+
+[[DEBUG] invoke 1
+
+[DEBUG] invoke 1
+FILE: src/traps.rs
+[DEBUG] invoke 1
+237ms
+LINE: 65
+[0COL: 22
+2
+] Ended: 260.957ms
+[02] fib(20) = Unexpected syndrome: DataAbort { kind: Permission, level: 3 }
+info: Info { source: LowerAArch64, kind: Synchronous }
+esr : 0x9200000F
+far : 0x000000000000002A
+tf:
+  ELR   : 0xFFFFFFFFC0001370
+  SPSR  : 0x20000340
+  SP    : 0xFFFFFFFFFFFFFC70
+  TPIDR : 4
+  TTBR0 : 0x000C0000
+  TTBR1 : 0x00240000
+  x0    : 0x00000000
+  x1    : 0x00000002
+  x7    : 0x00000001
+  x30   : 0xFFFFFFFFC00014A4
+
+957[[DEBUG] invoke 1
+04] Started: 217.436ms[DEBUG] invoke 1
+
+[0410946[DEBUG] invoke 1
+04] Started: 10946
+[0[DEBUG] invoke 1
+3[DEBUG] invoke 1
+[DEBUG] invoke 1
+
+[03] fib(20) = 10946 (86.533ms)
+01] Started: 247.88ms
+[DEBUG] invoke 1
+            (
+       (      )     )
+         )   (    (
+        (          `
+    .-""^"""^""^"""^""-.
+  (//\\//\\//\\//\\//\\//)
+   ~\^^^^^^^^^^^^^^^^^^/~
+     `================`
+
+    The pi is overdone.
+
+---------- PANIC ----------
+
+FILE: src/traps.rs
+LINE: 65
+COL: 22
+
+Unexpected syndrome: DataAbort { kind: Permission, level: 3 }
+info: Info { source: LowerAArch64, kind: Synchronous }
+esr : 0x9200000F
+far : 0x0000000000000009
+tf:
+  ELR   : 0xFFFFFFFFC0001474
+  SPSR  : 0x00000340
+  SP    : 0xFFFFFFFFFFFFFE00
+  TPIDR : 1
+  TTBR0 : 0x000C0000
+  TTBR1 : 0x00100000
+  x0    : 0x00000000
+  x1    : 0x00000000
+  x7    : 0x00000001
+  x30   : 0xFFFFFFFFC00012EC
+
+            (
+       (      )     )
+         )   (    (
+        (          `
+    .-""^"""^""^"""^""-.
+  (//\\//\\//\\//\\//\\//)
+   ~\^^^^^^^^^^^^^^^^^^/~
+     `================`
+
+    The pi is overdone.
+
+[DEBUG] invoke 1
+---------- PANIC ----------
+ (
+FILE: src/traps.rs
+LINE: 65
+COL: 22
+72.72ms
+)
+Unexpected syndrome: DataAbort { kind: Permission, level: 3 }
+info: Info { source: LowerAArch64, kind: Synchronous }
+esr : 0x9200000F
+far : 0x0000000000000009
+tf:
+  ELR   : 0xFFFFFFFFC0001474
+  SPSR  : 0x00000340
+  SP    : 0xFFFFFFFFFFFFFE00
+  TPIDR : 1
+  TTBR0 : 0x000C0000
+  TTBR1 : 0x00100000
+  x0    : 0x00000000
+  x1    : 0x00000000
+  x7    : 0x00000001
+  x30   : 0xFFFFFFFFC00012EC
+
+[[DEBUG] invoke 1
+01] Ended: 328.402ms
+[01] fib(20) = 10946 (80.522ms)
+```
+
+## プロセス1個で実行
+
+```bash
+./qemu.sh build/kernel.bin -drive file=/home/vagrant/rustos/user/fs.img,format=raw,if=sd
+[INFO] text beg: 0000000000080000, end: 000000000009c0f8
+[INFO] bss  beg: 000000000009c0c0, end: 000000000009c0f8
+[INFO] MMU is ready for core-1/@sp=000000000006ff20
+[INFO] MMU is ready for core-2/@sp=000000000005ff20
+[INFO] MMU is ready for core-3/@sp=000000000004ff20
+[INFO] MMU is ready for core-0/@sp=000000000007fef0
+[INFO] core 1 started
+[INFO] core 2 started
+[INFO] core 3 started
+[TRACE] [1] tick
+[TRACE] [3] tick
+[TRACE] [core-3] switch_to 1, pc: ffffffffc0000000, lr: 0, x29: 0, x28: 0, x27: 50000 (= core3のsp)
+[TRACE] [core-1] switch_to 1, pc: ffffffffc0000584, lr: ffffffffc00000a8, x29: 0, x28: 0, x27: 70000 (= core1のsp)   # core3で処理済みのプロセスをcore1でも実行しようとしている
+[TRACE] [0] tick
+[TRACE] [core-0] switch_to 1, pc: ffffffffc0000584, lr: ffffffffc00000a8, x29: 0, x28: 0, x27: 80000 (= core0のsp)   # core3で処理済みのプロセスをcore0でも実行しようとしている
+PID [1] fib(20) = 10946 (666µs)
+[TRACE] [0]: kill pid=1
+[TRACE] [2] tick
+PID [[TRACE] [3] tick
+[TRACE] [1] tick
+```
+
+## 原因判明
+
+- scheduler::switch_to()で実行すべきプロセスの状態を誤って`State::Ready`に
+   していたため、1つのプロセスを複数のコアが処理していた。
+- `State::Running`に変更したことでパニックは発生しなくなった。
+- プロセスの出力は混ざるのでmutexは依然として正しくない模様
+
+```bash
+./qemu.sh build/kernel.bin -drive file=/home/vagrant/rustos/user/fs.img,format=raw,if=sd
+[INFO] text beg: 0000000000080000, end: 000000000009caf8
+[INFO] bss  beg: 000000000009cac0, end: 000000000009caf8
+[INFO] MMU is ready for core-2/@sp=000000000005ff20
+[INFO] MMU is ready for core-3/@sp=000000000004ff20
+[INFO] MMU is ready for core-1/@sp=000000000006ff20
+[INFO] MMU is ready for core-0/@sp=000000000007fef0
+[INFO] core 1 started
+PID [1] fib(20) = PID [109462] fib(20) = 10946 (839µs)   # PID [1] fib(20) = 10946 (478µs)
+ (478µs)                                                 # PID [2] fib(20) = 10946 (839µs)
+PID [PID [34] fib(20) = 10946 (404µs)                    # PID [4] fib(20) = 10946 (404µs)
+[INFO] core 2 started
+] fib(20) = [INFO] core 3 started                        # [INFO] core 3 started
+10946 (396µs)                                            # PID [3] fib(20) = 10946 (396µs)
+QEMU: Terminated
+```
+
+## コア1つで実行
+
+```bash
+./qemu.sh build/kernel.bin -drive file=/home/vagrant/rustos/user/fs.img,format=raw,if=sd
+[INFO] text beg: 0000000000080000, end: 000000000009caf8
+[INFO] bss  beg: 000000000009cac0, end: 000000000009caf8
+[INFO] MMU is ready for core-0/@sp=000000000007fef0
+PID [2] fib(20) = 10946 (407µs)
+PID [1] fib(20) = 10946 (421µs)
+PID [3] fib(20) = 10946 (765µs)
+PID [4] fib(20) = 10946 (761µs)
+QEMU: Terminated
+```
