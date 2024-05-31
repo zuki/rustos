@@ -1,7 +1,7 @@
 use aarch64::*;
 
 use core::mem::zeroed;
-use core::ptr::{write_volatile, read_volatile};
+use core::ptr::write_volatile;
 
 mod oom;
 mod panic;

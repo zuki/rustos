@@ -1,12 +1,12 @@
 use core::alloc::Layout;
 use core::fmt::{Debug, Formatter, Result};
-use core::ptr;
+//use core::ptr;
 
 use crate::allocator::linked_list::LinkedList;
 use crate::allocator::util::*;
 use crate::allocator::LocalAlloc;
 
-use crate::console::kprintln;
+//use crate::console::kprintln;
 
 const NUM_BINS: usize = 30;
 

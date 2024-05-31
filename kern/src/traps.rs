@@ -3,10 +3,10 @@ mod syndrome;
 mod syscall;
 
 pub mod irq;
-use core::borrow::BorrowMut;
+//use core::borrow::BorrowMut;
 
 pub use self::frame::TrapFrame;
-use self::irq::GlobalIrq;
+//use self::irq::GlobalIrq;
 
 use aarch64::affinity;
 use pi::interrupt::{Controller, Interrupt};
@@ -52,7 +52,7 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame, far
     match info.kind {
         Kind::Synchronous => {
             match Syndrome::from(esr) {
-                Syndrome::Brk(n) => {
+                Syndrome::Brk(_n) => {
                     // kprintln!("Syndrome::Brk({})", n);
                     // kprintln!("  ELR: 0x{:x}", tf.elr);
                     crate::shell::shell("debug > ");

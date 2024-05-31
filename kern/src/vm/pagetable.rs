@@ -10,7 +10,7 @@ use crate::allocator;
 use crate::param::*;
 use crate::vm::{PhysicalAddr, VirtualAddr};
 use crate::ALLOCATOR;
-use crate::console::kprintln;
+//use crate::console::kprintln;
 
 use aarch64::vmsa::*;
 use shim::const_assert_size;
@@ -202,7 +202,7 @@ impl KernPageTable {
     /// 定義を参照.
     pub fn new() -> KernPageTable {
         let mut pt = PageTable::new(EntryPerm::KERN_RW);
-        let (start_addr, end_addr) = allocator::memory_map().unwrap();
+        let (_start_addr, end_addr) = allocator::memory_map().unwrap();
         //kprintln!("memory_map: 0x{:08X} - 0x{:08X}", start_addr, end_addr);
         //kprintln!("IO_BASE   : 0x{:08X} - 0x{:08X}", IO_BASE, IO_BASE_END);
         for addr in (0..end_addr).step_by(PAGE_SIZE) {

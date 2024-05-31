@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use core::fmt;
 use hashbrown::HashMap;
 use shim::io;
-use crate::vfat::Error;
+//use crate::vfat::Error;
 
 use crate::traits::BlockDevice;
 
@@ -98,7 +98,7 @@ impl CachedPartition {
     fn get_entry(&mut self, sector: u64) -> io::Result<&mut CacheEntry> {
         if let None = self.cache.get_mut(&sector) {
             let mut buf: Vec<u8> = Vec::new();
-            self.load_sector(&mut buf, sector);
+            self.load_sector(&mut buf, sector)?;
 
             self.cache.insert(sector, CacheEntry {
                 dirty: false,

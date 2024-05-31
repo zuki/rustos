@@ -4,7 +4,7 @@ use core::ops::{Deref, DerefMut, Drop};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use aarch64::affinity;
 
-use crate::percore::{self, is_mmu_ready};
+use crate::percore;
 
 #[repr(align(32))]
 pub struct Mutex<T> {

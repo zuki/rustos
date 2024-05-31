@@ -3,13 +3,13 @@ pub mod sd;
 use alloc::rc::Rc;
 use core::fmt::{self, Debug};
 use shim::io;
-use shim::ioerr;
+//use shim::ioerr;
 use shim::path::Path;
 
 pub use fat32::traits;
-use fat32::vfat::{Dir, Entry, File, VFat, VFatHandle};
+use fat32::vfat::{VFat, VFatHandle};
 
-use self::sd::Sd;
+//use self::sd::Sd;
 use crate::mutex::Mutex;
 
 #[derive(Clone)]

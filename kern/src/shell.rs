@@ -1,21 +1,21 @@
 use shim::io;
-use shim::path::{Path, PathBuf};
-use shim::ffi::{OsStr, OsString};
+use shim::path::PathBuf;
+//use shim::ffi::{OsStr, OsString};
 use alloc::string::String;
 
 use stack_vec::StackVec;
 use core::str;
-use core::time::Duration;
+//use core::time::Duration;
 
-use pi::atags::Atags;
+//use pi::atags::Atags;
 
 use fat32::traits::FileSystem;
 use fat32::traits::{Dir, Entry, File};
-use fat32::traits::metadata::{Metadata, Timestamp};
+use fat32::traits::metadata::Metadata;
 use crate::fs::PiVFatHandle;
 
 use crate::console::{kprint, kprintln, CONSOLE};
-use crate::ALLOCATOR;
+//use crate::ALLOCATOR;
 use crate::FILESYSTEM;
 
 
@@ -131,7 +131,7 @@ fn do_cat(path: &PathBuf)  {
                             break;
                         } else {
                             let mut console = CONSOLE.lock();
-                            console.write(&buf[0..*bytes]);
+                            console.write(&buf[0..*bytes]).unwrap();
                         }
                     }
                     Err(_) => {

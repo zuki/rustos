@@ -1,11 +1,11 @@
 use core::fmt;
 use core::time::Duration;
 
-use shim::const_assert_size;
+//use shim::const_assert_size;
 use shim::io;
 
 use volatile::prelude::*;
-use volatile::{ReadVolatile, Reserved, Volatile};
+use volatile::{ReadVolatile, Volatile};
 
 use crate::common::IO_BASE;
 use crate::gpio::{Function, Gpio};

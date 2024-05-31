@@ -13,7 +13,7 @@ use core::alloc::{GlobalAlloc, Layout};
 use core::fmt;
 
 use crate::mutex::Mutex;
-use pi::atags::{Atag, Atags};
+use pi::atags::Atags;
 
 /// `LocalAlloc`は標準ライブラリの `GlobalAlloc` に類似の
 /// トレイトであるが `alloc()` と `dealloc()` で `&mut self` を取る.

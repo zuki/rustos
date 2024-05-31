@@ -1,18 +1,18 @@
 use core::fmt::Debug;
 use core::marker::PhantomData;
-use core::mem::size_of;
+//use core::mem::size_of;
 
 use alloc::vec::Vec;
 
 use shim::io;
 use shim::ioerr;
-use shim::newioerr;
-use shim::path;
+//use shim::newioerr;
+//use shim::path;
 use shim::path::{Component, Path};
 
 use crate::mbr::MasterBootRecord;
 use crate::traits::{BlockDevice, FileSystem};
-use crate::util::SliceExt;
+//use crate::util::SliceExt;
 use crate::vfat::{BiosParameterBlock, CachedPartition, Partition};
 use crate::vfat::{Cluster, Dir, Entry, Error, FatEntry, File, Status};
 

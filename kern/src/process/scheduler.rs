@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
 use alloc::vec::Vec;
 
-use core::borrow::Borrow;
+//use core::borrow::Borrow;
 use core::ffi::c_void;
 use core::fmt;
 use core::mem;
@@ -16,20 +16,20 @@ use crate::mutex::Mutex;
 use crate::net::uspi::TKernelTimerHandle;
 use crate::param::*;
 use crate::percore;
-use crate::percore::{get_preemptive_counter, is_mmu_ready, local_irq};
+//use crate::percore::{get_preemptive_counter, is_mmu_ready, local_irq};
 use crate::process::{Id, Process, State};
-use crate::traps::irq::GlobalIrq;
+//use crate::traps::irq::GlobalIrq;
 use crate::traps::irq::IrqHandlerRegistry;
 use crate::traps::TrapFrame;
 use crate::{ETHERNET, USB};
 
-use crate::traps::irq;
-use crate::VMM;
+//use crate::traps::irq;
+//use crate::VMM;
 use crate::SCHEDULER;
-use crate::GLOABAL_IRQ;
-use crate::console::{kprint, kprintln};
-use pi::timer;
-use pi::interrupt::{Interrupt, Controller};
+//use crate::GLOABAL_IRQ;
+//use crate::console::{kprint, kprintln};
+//use pi::timer;
+//use pi::interrupt::{Interrupt, Controller};
 
 
 /// マシン全体用のプロセススケジューラ.
@@ -178,7 +178,7 @@ impl GlobalScheduler {
 
     /// スケジューラを初期化してユーザ空間プロセスをスケジューラに追加する.
     pub unsafe fn initialize(&self) {
-        let mut scheduler = Scheduler::new();
+        let scheduler = Scheduler::new();
         *self.0.lock() = Some(scheduler);
 
         for _ in 0..4 {
@@ -195,7 +195,7 @@ impl GlobalScheduler {
     pub fn test_phase_3(&self, proc: &mut Process) {
         use crate::vm::{VirtualAddr, PagePerm};
 
-        let mut page = proc.vmap.alloc(
+        let page = proc.vmap.alloc(
             VirtualAddr::from(USER_IMG_BASE as u64), PagePerm::RWX);
 
             let text = unsafe {

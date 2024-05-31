@@ -1,22 +1,22 @@
 #![feature(new_uninit)]
 use alloc::boxed::Box;
-use alloc::vec::Vec;
+//use alloc::vec::Vec;
 use core::mem;
-use shim::io;
+//use shim::io;
 use shim::path::Path;
 use fat32::traits::{Entry, File, FileSystem};
 
 use aarch64::*;
-use smoltcp::socket::SocketHandle;
+//use smoltcp::socket::SocketHandle;
 
 use crate::{param::*, FILESYSTEM};
-use crate::process::{Stack, State};
+use crate::process::State;
 use crate::traps::TrapFrame;
 use crate::vm::*;
 use kernel_api::{OsError, OsResult};
-use crate::console::kprintln;
+//use crate::console::kprintln;
 use crate::allocator::util::align_down;
-use shim::io::{Read, Seek};
+use shim::io::Read;
 
 /// プロセスID型用のType alias.
 pub type Id = u64;
@@ -70,8 +70,6 @@ impl Process {
     ///
     /// do_load が失敗した場合は OSError を返す.
     pub fn load<P: AsRef<Path>>(pn: P) -> OsResult<Process> {
-        use crate::VMM;
-
         let mut p = Process::do_load(pn)?;
 
         //FIXME: Set trapframe for the process.
@@ -93,7 +91,7 @@ impl Process {
         // 1. UserPageTableを作成
         let mut vmap = Box::new(UserPageTable::new());
         // 2. スタックを作成
-        let mut stack = vmap.alloc(Process::get_stack_base(), PagePerm::RW);
+        let stack = vmap.alloc(Process::get_stack_base(), PagePerm::RW);
         // 2.1 スタックを0クリア
         for byte in stack.iter_mut() {
             *byte = 0;
@@ -104,13 +102,13 @@ impl Process {
         // 4. ファイルを読み込む
         let mut addr = Process::get_image_base();
         let size = file.size() as usize;
-        for i in 0..size / PAGE_SIZE {
+        for _i in 0..size / PAGE_SIZE {
             let mut page = vmap.alloc(addr, PagePerm::RWX);
             file.read_exact(&mut page)?;
             addr += VirtualAddr::from(PAGE_SIZE);
         }
         if size % PAGE_SIZE != 0 {
-            let mut page = vmap.alloc(addr, PagePerm::RWX);
+            let page = vmap.alloc(addr, PagePerm::RWX);
             file.read_exact(&mut page[..size % PAGE_SIZE])?;
         }
         Ok(Process {

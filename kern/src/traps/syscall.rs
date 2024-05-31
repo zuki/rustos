@@ -1,9 +1,9 @@
 use alloc::boxed::Box;
-use core::time::Duration;
+//use core::time::Duration;
 
 use smoltcp::wire::{IpAddress, IpEndpoint};
 
-use crate::console::{kprint, CONSOLE};
+use crate::console::kprint;
 use crate::param::USER_IMG_BASE;
 use crate::process::State;
 use crate::traps::TrapFrame;
@@ -257,7 +257,7 @@ pub fn sys_write_str(va: usize, len: usize, tf: &mut TrapFrame) {
 
 // システムコールを処理する
 pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
-    use crate::console::kprintln;
+    //use crate::console::kprintln;
     //kprintln!("handle_syscall: {}", num);
     //kprintln!("x0: {:X}", tf.xn[0]);
     match num as usize {

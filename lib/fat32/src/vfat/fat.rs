@@ -1,7 +1,7 @@
 use crate::vfat::*;
 use core::fmt;
 
-use self::Status::*;
+//use self::Status::*;
 
 #[derive(Debug, PartialEq)]
 pub enum Status {
