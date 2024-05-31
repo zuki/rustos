@@ -21,12 +21,12 @@ const_assert_eq!(
     USER_IMG_BASE,
     ((1 << USER_MASK_BITS) - 1) << (64 - USER_MASK_BITS)
 );
-// 0xFFFF_FFFF_FFFF_0000
-pub const USER_STACK_BASE: usize = core::usize::MAX & PAGE_MASK;
 // 1GB
 pub const USER_MAX_VM_SIZE: usize = 0x4000_0000;
 // 0xFFFF_FFFF_FFFF_FFFF
-pub const USER_MAX_VM: usize = (USER_IMG_BASE - 1 + USER_MAX_VM_SIZE);
+pub const USER_MAX_VM: usize = 0xFFFF_FFFF_FFFF_FFFF;
+// 0xFFFF_FFFF_FFFF_0000
+pub const USER_STACK_BASE: usize = USER_MAX_VM & PAGE_MASK;
 
 const_assert_eq!(USER_IMG_BASE.wrapping_add(USER_MAX_VM_SIZE), 0);
 

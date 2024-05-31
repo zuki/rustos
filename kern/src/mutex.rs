@@ -43,6 +43,7 @@ impl<T> Mutex<T> {
                 None
             }
         } else {
+            assert!(affinity() == 0);
             if !self.lock.load(Ordering::Relaxed) {
                 self.lock.store(true, Ordering::Relaxed);
                 self.owner.store(percore::getcpu(), Ordering::Relaxed);
@@ -65,17 +66,18 @@ impl<T> Mutex<T> {
     }
 
     fn unlock(&self) {
+        let core = affinity();
         if percore::is_mmu_ready() {
-            let core = affinity();
             if self.owner.load(Ordering::Acquire) == core {
                 self.owner.store(usize::max_value(), Ordering::Release);
                 self.lock.store(false, Ordering::SeqCst);
                 percore::putcpu(core);
             }
         } else {
+            assert!(core == 0);
             self.owner.store(usize::max_value(), Ordering::Relaxed);
             self.lock.store(false, Ordering::Relaxed);
-            percore::putcpu(0);
+            percore::putcpu(core);
         }
     }
 

@@ -9,6 +9,7 @@ mod panic;
 use crate::kmain;
 use crate::param::*;
 use crate::VMM;
+use crate::SCHEDULER;
 use pi::common::SPINNING_BASE;
 
 global_asm!(include_str!("init/vectors.s"));
@@ -140,9 +141,7 @@ unsafe fn kmain2() -> ! {
     VMM.wait();
     info!("core {} started", core);
 
-    loop {
-        //info!("core {} looping", core);
-    }
+    SCHEDULER.start()
 }
 
 /// `init::start2` のアドレスを各自のスピニングアドレスに

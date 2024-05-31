@@ -8,6 +8,7 @@ use core::borrow::BorrowMut;
 pub use self::frame::TrapFrame;
 use self::irq::GlobalIrq;
 
+use aarch64::affinity;
 use pi::interrupt::{Controller, Interrupt};
 use pi::local_interrupt::{LocalController, LocalInterrupt};
 
@@ -65,11 +66,22 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame, far
             }
         }
         Kind::Irq => {
-            let controller = Controller::new();
-            for int in Interrupt::iter() {
-                if controller.is_pending(int) {
-                    //kprintln!("IRQ: {:?}", *int as u32);
-                    GLOABAL_IRQ.invoke(int, tf);
+            let core = affinity();
+            if core == 0 {
+                let controller = Controller::new();
+                for int in Interrupt::iter() {
+                    if controller.is_pending(int) {
+                        //kprintln!("IRQ: {:?}", *int as u32);
+                        GLOABAL_IRQ.invoke(int, tf);
+                    }
+                }
+            }
+
+            let local_controller = LocalController::new(core);
+            for int in LocalInterrupt::iter() {
+                if local_controller.is_pending(int) {
+                    //trace!("invoke {}", int as u32);
+                    percore::local_irq().invoke(int, tf);
                 }
             }
         }

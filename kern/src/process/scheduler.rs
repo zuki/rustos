@@ -9,12 +9,13 @@ use core::mem;
 use core::time::Duration;
 
 use aarch64::*;
-use pi::local_interrupt::LocalInterrupt;
+use pi::local_interrupt::{LocalInterrupt, LocalController};
 use smoltcp::time::Instant;
 
 use crate::mutex::Mutex;
 use crate::net::uspi::TKernelTimerHandle;
 use crate::param::*;
+use crate::percore;
 use crate::percore::{get_preemptive_counter, is_mmu_ready, local_irq};
 use crate::process::{Id, Process, State};
 use crate::traps::irq::GlobalIrq;
@@ -29,6 +30,7 @@ use crate::GLOABAL_IRQ;
 use crate::console::{kprint, kprintln};
 use pi::timer;
 use pi::interrupt::{Interrupt, Controller};
+
 
 /// マシン全体用のプロセススケジューラ.
 #[derive(Debug)]
@@ -103,28 +105,36 @@ impl GlobalScheduler {
     /// 使ってユーザ空間のプロセスの実行を開始する。このメソッドは
     /// 通常の条件では復帰しない。
     pub fn start(&self) -> ! {
-        self.initialize_global_timer_interrupt();
+        let core = affinity();
 
         let mut tf = Box::new(TrapFrame::default());
         self.critical(|scheduler| scheduler.switch_to(&mut tf));
 
-        debug!("start: tf\n{:?}", tf);
-        // 次のページを計算してspにセットする
-        let _new_sp = KERN_STACK_BASE - PAGE_SIZE;
+        if core == 0 {
+            self.initialize_global_timer_interrupt();
+        }
+        self.initialize_local_timer_interrupt();
+
+        //let mut tf = Box::new(TrapFrame::default());
+        //self.critical(|scheduler| scheduler.switch_to(&mut tf));
+
+        //trace!("start [{}]: tf\n{:?}", affinity(), tf);
+        let old_sp = KERN_STACK_BASE - KERN_STACK_SIZE * core as usize;
+        //debug!("[{}] old_sp: 0x{:x}", core, old_sp);
+
         unsafe {
-            asm!("mov x0, $0
-                  mov sp, x0"
-                 :: "r"(tf)
+            asm!("mov x28, $0
+                  mov x29, $1
+                  mov sp, x28"
+                 :: "r"(tf), "r"(old_sp)
                  :: "volatile");
             asm!("bl context_restore" :::: "volatile");
-        /*
-            asm!("mov x0, $0
-                  mov sp, x0"
-                 :: "i"(new_sp)
-                 :: "volatile");
-            asm!("mov x0, xzr"
-                 :::: "volatile");
-        */
+            asm!("mov x27, x29
+                  ldp x28, x29, [sp], #16
+                  ldp lr, xzr, [sp], #16
+                  mov sp, x27"
+                :::: "volatile");
+
             eret();
         }
 
@@ -143,43 +153,39 @@ impl GlobalScheduler {
     /// 1 秒後に `poll_ethernet` を起動するタイマーハンドラを
     /// `Usb::start_kernel_timer` に登録する.
     pub fn initialize_global_timer_interrupt(&self) {
-        // タイマー割り込みハンドラの設定
-        GLOABAL_IRQ.register(
-            Interrupt::Timer1,
+        // noop
+    }
+
+    /// `pi::local_interrupt`を使ってper-coreローカルタイマーを初期化する.
+    /// タイマーは`CntpnsIrq`が`param.rs`で定義されている毎`TICK`間隔で
+    /// 発火すように設定する必要がある.
+    pub fn initialize_local_timer_interrupt(&self) {
+        // Lab 5 2.C
+        percore::local_irq().register(
+            LocalInterrupt::CNTPNSIRQ,
             Box::new(|tf| {
-                timer::tick_in(TICK);
-                let old_id = tf.tpidr;
-                let id = SCHEDULER.switch(State::Ready, tf);
-                trace!("TICK, switch from {} to {}", old_id, id);
+                trace!("[{}] tick", affinity());
+                pi::local_interrupt::local_tick_in(affinity(), TICK);
+                SCHEDULER.switch(State::Ready, tf);
             }),
         );
 
-        // タイマー割り込みの有効化
-        timer::tick_in(TICK);
-        let mut controller = Controller::new();
-        controller.enable(Interrupt::Timer1);
-
+        let core = affinity();
+        pi::local_interrupt::local_tick_in(core, TICK);
+        let mut local_controller = LocalController::new(core);
+        local_controller.enable_local_timer();
     }
 
-    /// Initializes the per-core local timer interrupt with `pi::local_interrupt`.
-    /// The timer should be configured in a way that `CntpnsIrq` interrupt fires
-    /// every `TICK` duration, which is defined in `param.rs`.
-    pub fn initialize_local_timer_interrupt(&self) {
-        // Lab 5 2.C
-        unimplemented!("initialize_local_timer_interrupt()")
-    }
-
-    /// Initializes the scheduler and add userspace processes to the Scheduler.
+    /// スケジューラを初期化してユーザ空間プロセスをスケジューラに追加する.
     pub unsafe fn initialize(&self) {
         let mut scheduler = Scheduler::new();
+        *self.0.lock() = Some(scheduler);
 
         for _ in 0..4 {
             let p = Process::load("/fib").expect("load /fib");
-            scheduler.add(p);
+            //scheduler.add(p);
+            self.add(p);
         }
-
-        *self.0.lock() = Some(scheduler);
-
     }
 
     // 次のメソッドはフェーズ3のテストに役に立つだろう。
@@ -244,7 +250,7 @@ impl Scheduler {
         };
         self.last_id = Some(id);
         process.context.tpidr = id;
-        //kprintln!("process {} added", id);
+        trace!("pid {} added to core {}", id, affinity());
         self.processes.push_back(process);
         Some(id)
     }
@@ -286,14 +292,15 @@ impl Scheduler {
         }
         // 切り替えるプロセスがない
         if index == self.processes.len() {
+            trace!("[{}] no process", affinity());
             return None;
         }
-        trace!("sw_to_before.tf\n{:?}", &tf);
+        //trace!("sw_to_before.tf\n{:?}", &tf);
         let mut process = self.processes.remove(index).unwrap();
-        process.state = State::Ready;
+        process.state = State::Running;
         *tf = *process.context;
         let id = process.context.tpidr;
-        trace!("sw_to_after.tf\n{:?}", &tf);
+        //trace!("sw_to_after.tf\n{:?}", &tf);
         self.processes.push_front(process);
         Some(id)
     }
@@ -307,6 +314,7 @@ impl Scheduler {
             Some(index) => {
                 let mut process = self.processes.remove(index).unwrap();
                 process.state = State::Dead;
+                trace!("[{}]: kill pid={}", affinity(), process.context.tpidr);
                 Some(process.context.tpidr)
             }
             None => None,
