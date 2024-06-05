@@ -20,7 +20,7 @@ fn main() {
     let beg = time();
     println!("[{:02}] Started: {:?}", pid, beg);
 
-    let rtn = fib(40);
+    let rtn = fib(20);
 
     let end = time();
     println!("[{:02}] Ended: {:?}", pid, end);

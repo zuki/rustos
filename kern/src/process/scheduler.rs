@@ -290,7 +290,7 @@ impl Scheduler {
         }
         //kprintln!("sw_to_before.tf\n{:?}", &tf);
         let mut process = self.processes.remove(index).unwrap();
-        process.state = State::Ready;
+        process.state = State::Running;
         *tf = *process.context;
         let id = process.context.tpidr;
         //kprintln!("sw_to_after.tf\n{:?}", &tf);
