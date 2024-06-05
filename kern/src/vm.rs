@@ -2,6 +2,7 @@ mod address;
 mod pagetable;
 
 pub use self::address::{PhysicalAddr, VirtualAddr};
+use pi::common::NCORES;
 pub use self::pagetable::*;
 
 use aarch64::*;
@@ -31,14 +32,18 @@ impl VMManager {
         }
     }
 
-    /// 仮想メモリマネージャを初期化するr.
+    /// 仮想メモリマネージャを初期化する.
     /// callerはカーネル初期化中にこの関数を一度だけ
     /// 呼び出さなければならない。
     pub unsafe fn initialize(&self) {
         //kprintln!("ininitaiize VMM: call KernPageTabel::new");
-        let kern_pt = KernPageTable::new();
-        self.kern_pt_addr.store(kern_pt.get_baddr().as_usize(), Ordering::Relaxed);
-        *(self.kern_pt.lock()) = Some(kern_pt);
+        let mut kern_pt = KernPageTable::new();
+        let baddr_kern_pt = kern_pt.get_baddr();
+
+        if self.kern_pt.lock().replace(kern_pt).is_some() {
+            panic!("VMManager initialize called twice");
+        }
+        self.kern_pt_addr.store(baddr_kern_pt.as_usize(), Ordering::Relaxed);
     }
 
     /// 仮想メモリマネージャを設定するr.
@@ -107,9 +112,12 @@ impl VMManager {
         }
 
         info!("MMU is ready for core-{}/@sp={:016x}", affinity(), SP.get());
-
+        
         // Lab 5 1.B
-        unimplemented!("wait for other cores")
+        // MMU初期化済みのコア数をインクルメント
+        self.ready_core_cnt.fetch_add(1, Ordering::AcqRel);
+        // すべてのコアがMMUの初期化を終えるのを待機する
+        while self.ready_core_cnt.load(Ordering::Acquire) != NCORES {}
     }
 
     /// カーネルページテーブルのベースアドレスを `PhysicalAddrP` として返す.
@@ -117,3 +125,4 @@ impl VMManager {
         PhysicalAddr::from(self.kern_pt_addr.load(Ordering::Relaxed))
     }
 }
+
