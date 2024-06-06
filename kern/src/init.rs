@@ -138,10 +138,10 @@ unsafe fn kmain2() -> ! {
     let spinning = SPINNING_BASE.add(core as usize);
     spinning.write_volatile(0);
     VMM.wait();
-    info!("core {} started", core);
+    //info!("core {} started", core);
 
     loop {
-        //info!("core {} looping", core);
+        //info!("kmain2: {}", core);        
     }
 }
 
