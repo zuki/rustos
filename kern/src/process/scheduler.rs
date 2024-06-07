@@ -172,13 +172,13 @@ impl GlobalScheduler {
     /// Initializes the scheduler and add userspace processes to the Scheduler.
     pub unsafe fn initialize(&self) {
         let mut scheduler = Scheduler::new();
+        *self.0.lock() = Some(scheduler);
 
         for _ in 0..4 {
             let p = Process::load("/fib").expect("load /fib");
-            scheduler.add(p);
+            self.add(p);
         }
 
-        *self.0.lock() = Some(scheduler);
 
     }
 

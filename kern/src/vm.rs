@@ -115,9 +115,9 @@ impl VMManager {
         
         // Lab 5 1.B
         // MMU初期化済みのコア数をインクルメント
-        self.ready_core_cnt.fetch_add(1, Ordering::SeqCst);
+        self.ready_core_cnt.fetch_add(1, Ordering::AcqRel);
         // すべてのコアがMMUの初期化を終えるのを待機する
-        while self.ready_core_cnt.load(Ordering::SeqCst) != NCORES {}
+        while self.ready_core_cnt.load(Ordering::Acquire) != NCORES {}
     }
 
     /// カーネルページテーブルのベースアドレスを `PhysicalAddrP` として返す.

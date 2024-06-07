@@ -35,18 +35,19 @@ impl<T> Mutex<T> {
 
 impl<T> Mutex<T> {
     pub fn try_lock(&self) -> Option<MutexGuard<T>> {
+        let core = affinity();
         if is_mmu_ready() {
-            if !self.lock.compare_and_swap(false, true, Ordering::SeqCst) {
-                self.owner.store(getcpu(), Ordering::SeqCst);
+            if !self.lock.compare_and_swap(false, true, Ordering::AcqRel) {
+                self.owner.store(getcpu(), Ordering::Release);
                 Some(MutexGuard { lock: &self })
             } else {
                 None
             }
         } else {
-            assert!(affinity() == 0);
+            assert!(core == 0);
             if !self.lock.load(Ordering::Relaxed) {
                 self.lock.store(true, Ordering::Relaxed);
-                self.owner.store(getcpu(), Ordering::Relaxed);
+                self.owner.store(core, Ordering::Relaxed);
                 Some(MutexGuard { lock: &self })
             } else {
                 None
@@ -68,16 +69,20 @@ impl<T> Mutex<T> {
     fn unlock(&self) {
         let core = affinity();
         if is_mmu_ready() {
+        /*
             if self.owner.load(Ordering::SeqCst) == core {
                 self.owner.store(usize::max_value(), Ordering::SeqCst);
                 self.lock.store(false, Ordering::SeqCst);
                 putcpu(core);
             }
+        */
+            putcpu(self.owner.load(Ordering::Acquire));
+            self.lock.compare_and_swap(true, false, Ordering::AcqRel);
         } else {
             assert!(core == 0);
-            self.owner.store(usize::max_value(), Ordering::Relaxed);
+            //self.owner.store(usize::max_value(), Ordering::Relaxed);
             self.lock.store(false, Ordering::Relaxed);
-            putcpu(core);
+            //putcpu(core);
         }
     }
 
