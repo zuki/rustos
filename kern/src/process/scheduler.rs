@@ -9,7 +9,7 @@ use core::mem;
 use core::time::Duration;
 
 use aarch64::*;
-use pi::local_interrupt::LocalInterrupt;
+use pi::local_interrupt::{LocalInterrupt, LocalController, local_tick_in};
 use smoltcp::time::Instant;
 
 use crate::mutex::Mutex;
@@ -103,20 +103,34 @@ impl GlobalScheduler {
     /// 使ってユーザ空間のプロセスの実行を開始する。このメソッドは
     /// 通常の条件では復帰しない。
     pub fn start(&self) -> ! {
-        self.initialize_global_timer_interrupt();
+        //self.initialize_global_timer_interrupt();
+
+
+        if affinity() == 0 {
+            self.initialize_global_timer_interrupt();
+        }
+        self.initialize_local_timer_interrupt();
 
         let mut tf = Box::new(TrapFrame::default());
         self.critical(|scheduler| scheduler.switch_to(&mut tf));
 
         //kprintln!("tf\n{:?}", tf);
         // 次のページを計算してspにセットする
-        let _new_sp = KERN_STACK_BASE - PAGE_SIZE;
+        let mut cur_sp = SP.get();
+
         unsafe {
-            asm!("mov x0, $0
-                  mov sp, x0"
-                 :: "r"(tf)
+            asm!("mov x28, $0
+                  mov x29, $1
+                  mov sp, x28"
+                 :: "r"(tf), "r"(cur_sp)
                  :: "volatile");
             asm!("bl context_restore" :::: "volatile");
+            asm!("mov $0, x29" : "=r"(cur_sp) ::: "volatile");
+            asm!("ldp x28, x29, [SP], #16
+                  ldp lr,  xzr, [SP], #16
+                  mov sp, $0"
+                 :: "r"(cur_sp) :: "volatile");
+
         /*
             asm!("mov x0, $0
                   mov sp, x0"
@@ -144,6 +158,7 @@ impl GlobalScheduler {
     /// `Usb::start_kernel_timer` に登録する.
     pub fn initialize_global_timer_interrupt(&self) {
         // タイマー割り込みハンドラの設定
+    /*
         GLOABAL_IRQ.register(
             Interrupt::Timer1,
             Box::new(|tf| {
@@ -158,7 +173,7 @@ impl GlobalScheduler {
         timer::tick_in(TICK);
         let mut controller = Controller::new();
         controller.enable(Interrupt::Timer1);
-
+    */
     }
 
     /// Initializes the per-core local timer interrupt with `pi::local_interrupt`.
@@ -166,9 +181,20 @@ impl GlobalScheduler {
     /// every `TICK` duration, which is defined in `param.rs`.
     pub fn initialize_local_timer_interrupt(&self) {
         // Lab 5 2.C
-        unimplemented!("initialize_local_timer_interrupt()")
-    }
+        let mut controller = LocalController::new(affinity());
+        controller.enable_local_timer();
+        
+        local_irq().register(
+	    LocalInterrupt::CNTPNSIRQ, 
+      	    Box::new(|tf| {
+                local_tick_in(affinity(), TICK);
+                SCHEDULER.switch(State::Ready, tf);
+            }),
+        );
 
+        controller.tick_in(TICK);
+    } 
+	
     /// Initializes the scheduler and add userspace processes to the Scheduler.
     pub unsafe fn initialize(&self) {
         let mut scheduler = Scheduler::new();

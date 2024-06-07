@@ -6,10 +6,6 @@ use volatile::{ReadVolatile, Volatile};
 
 /// ARMシステムタイマーレジスタの基底アドレス.
 const TIMER_REG_BASE: usize = IO_BASE + 0x3000;
-/// タイマー周波数: 1MHz
-const TIMER_FREQ: u64 = 1_000_000;
-/// タイマー周期（ナノ秒単位）
-const TICK_NANOS: u64 = 1_000_000_000 / TIMER_FREQ;
 
 #[repr(C)]
 #[allow(non_snake_case)]
@@ -46,11 +42,10 @@ impl Timer {
     /// タイマー1の割り込みが有効かつIRQがアンマスクの場合、`t` 時間後に
     /// タイマー割り込みが発行される。
     pub fn tick_in(&mut self, t: Duration) {
-        self.registers.CS.write(1u32 << 1);
-
-        let fire = self.registers.CLO.read()
-            .wrapping_add((t.as_nanos() as u64 / TICK_NANOS as u64) as u32);
+        let now = self.registers.CLO.read();
+        let fire = now.wrapping_add(t.as_micros() as u32);
         self.registers.COMPARE[1].write(fire);
+        self.registers.CS.write(1u32 << 1);
     }
 }
 
