@@ -35,14 +35,18 @@ impl VMManager {
         }
     }
 
-    /// 仮想メモリマネージャを初期化するr.
+    /// 仮想メモリマネージャを初期化する.
     /// callerはカーネル初期化中にこの関数を一度だけ
     /// 呼び出さなければならない。
     pub unsafe fn initialize(&self) {
         //kprintln!("ininitaiize VMM: call KernPageTabel::new");
-        let kern_pt = KernPageTable::new();
-        self.kern_pt_addr.store(kern_pt.get_baddr().as_usize(), Ordering::Relaxed);
-        *(self.kern_pt.lock()) = Some(kern_pt);
+        let mut kern_pt = KernPageTable::new();
+        let baddr_kern_pt = kern_pt.get_baddr();
+
+        if self.kern_pt.lock().replace(kern_pt).is_some() {
+            panic!("VMManager initialize called twice");
+        }
+        self.kern_pt_addr.store(baddr_kern_pt.as_usize(), Ordering::Relaxed);
     }
 
     /// 仮想メモリマネージャを設定する.

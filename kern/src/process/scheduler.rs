@@ -26,11 +26,15 @@ use crate::{ETHERNET, USB};
 //use crate::traps::irq;
 //use crate::VMM;
 use crate::SCHEDULER;
-//use crate::GLOABAL_IRQ;
+//use crate::GLOBAL_IRQ;
 //use crate::console::{kprint, kprintln};
 //use pi::timer;
 //use pi::interrupt::{Interrupt, Controller};
 
+extern "C" {
+    fn _start();
+    fn context_restore();
+}
 
 /// マシン全体用のプロセススケジューラ.
 #[derive(Debug)]
@@ -107,41 +111,42 @@ impl GlobalScheduler {
     pub fn start(&self) -> ! {
         let core = affinity();
 
-        let mut tf = Box::new(TrapFrame::default());
-        self.critical(|scheduler| scheduler.switch_to(&mut tf));
+        //let mut tf = Box::new(TrapFrame::default());
+        //self.critical(|scheduler| scheduler.switch_to(&mut tf));
 
         if core == 0 {
             self.initialize_global_timer_interrupt();
         }
         self.initialize_local_timer_interrupt();
 
-        //let mut tf = Box::new(TrapFrame::default());
-        //self.critical(|scheduler| scheduler.switch_to(&mut tf));
+        let mut tf = Box::new(TrapFrame::default());
+        self.critical(|scheduler| scheduler.switch_to(&mut tf));
 
         //trace!("start [{}]: tf\n{:?}", affinity(), tf);
-        let old_sp = KERN_STACK_BASE - KERN_STACK_SIZE * core as usize;
-        //debug!("[{}] old_sp: 0x{:x}", core, old_sp);
-
+        //let old_sp = KERN_STACK_BASE - KERN_STACK_SIZE * core as usize;
+        let mut cur_sp = SP.get();
+        //debug!("[{}] cur_sp: 0x{:x}, tf: {:?}", core, cur_sp, tf);
+        // FIXME: ユーザプロセスのレジスタはさわらないが「カーネル
+        // スタックにコピーされたトラップフレームのアドレスを SPに設定」
+        // ではない。ただし、x28を使うとパニックになる。また、tfに
+        // x28, x29はセットされていない。
         unsafe {
             asm!("mov x28, $0
                   mov x29, $1
                   mov sp, x28"
-                 :: "r"(tf), "r"(old_sp)
+                 :: "r"(tf), "r"(cur_sp)
                  :: "volatile");
             asm!("bl context_restore" :::: "volatile");
-            asm!("mov x27, x29
-                  ldp x28, x29, [sp], #16
+            asm!("mov $0, x29" : "=r"(cur_sp) ::: "volatile");
+            asm!("ldp x28, x29, [sp], #16
                   ldp lr, xzr, [sp], #16
-                  mov sp, x27"
-                :::: "volatile");
-
+                  mov sp, $0"
+                :: "r"(cur_sp) :: "volatile");
             eret();
         }
 
         loop {};
     }
-
-
 
     /// スケジューラを初期化してユーザ空間のプロセスをスケジューラに追加する.
     /// # Lab 4
@@ -153,7 +158,9 @@ impl GlobalScheduler {
     /// 1 秒後に `poll_ethernet` を起動するタイマーハンドラを
     /// `Usb::start_kernel_timer` に登録する.
     pub fn initialize_global_timer_interrupt(&self) {
-        // noop
+        if affinity() != 0 {
+            return;
+        }
     }
 
     /// `pi::local_interrupt`を使ってper-coreローカルタイマーを初期化する.

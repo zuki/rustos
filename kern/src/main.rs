@@ -44,7 +44,7 @@ pub static FILESYSTEM: FileSystem = FileSystem::uninitialized();
 pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
 pub static VMM: VMManager = VMManager::uninitialized();
 pub static USB: Usb = Usb::uninitialized();
-pub static GLOABAL_IRQ: GlobalIrq = GlobalIrq::new();
+pub static GLOBAL_IRQ: GlobalIrq = GlobalIrq::new();
 pub static FIQ: Fiq = Fiq::new();
 pub static ETHERNET: GlobalEthernetDriver = GlobalEthernetDriver::uninitialized();
 
@@ -57,6 +57,8 @@ extern "C" {
 
 unsafe fn kmain() -> ! {
     crate::logger::init_logger();
+
+    //info!("Welcome to cs3210!");
 
     info!(
         "text beg: {:016x}, end: {:016x}",
@@ -71,12 +73,10 @@ unsafe fn kmain() -> ! {
     FILESYSTEM.initialize();
     VMM.initialize();
     SCHEDULER.initialize();
-
+    //debug!("1");
     init::initialize_app_cores();
+    //debug!("2");
     VMM.wait();
+    //debug!("3");
     SCHEDULER.start();
-/*
-    info!("Welcome to cs3210!");
-    shell::shell("> ");
-*/
 }

@@ -6,15 +6,15 @@
 #[macro_use]
 pub mod macros;
 
-pub mod sp;
 pub mod asm;
 pub mod regs;
+pub mod sp;
 pub mod vmsa;
 
-pub use sp::SP;
-pub use regs::*;
-pub use vmsa::*;
 pub use asm::*;
+pub use regs::*;
+pub use sp::SP;
+pub use vmsa::*;
 
 /// 現在の例外レベルを返す.
 ///

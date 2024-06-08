@@ -25,6 +25,9 @@ impl fmt::Debug for TrapFrame {
         writeln!(f, "  x0    : 0x{:08X}", self.xn[0])?;
         writeln!(f, "  x1    : 0x{:08X}", self.xn[1])?;
         writeln!(f, "  x7    : 0x{:08X}", self.xn[7])?;
+        writeln!(f, "  x27   : 0x{:08X}", self.xn[27])?;
+        writeln!(f, "  x28   : 0x{:08X}", self.xn[28])?;
+        writeln!(f, "  x29   : 0x{:08X}", self.xn[29])?;
         writeln!(f, "  x30   : 0x{:08X}", self.xn[30])?;
         Ok(())
     }

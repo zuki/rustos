@@ -16,7 +16,7 @@ use self::syndrome::Syndrome;
 use self::syscall::handle_syscall;
 use crate::percore;
 use crate::traps::irq::IrqHandlerRegistry;
-use crate::GLOABAL_IRQ;
+use crate::GLOBAL_IRQ;
 
 #[repr(u16)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -72,7 +72,7 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame, far
                 for int in Interrupt::iter() {
                     if controller.is_pending(int) {
                         //kprintln!("IRQ: {:?}", *int as u32);
-                        GLOABAL_IRQ.invoke(int, tf);
+                        GLOBAL_IRQ.invoke(int, tf);
                     }
                 }
             }

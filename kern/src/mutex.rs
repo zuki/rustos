@@ -4,7 +4,7 @@ use core::ops::{Deref, DerefMut, Drop};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use aarch64::affinity;
 
-use crate::percore;
+use crate::percore::{is_mmu_ready, getcpu, putcpu};
 
 #[repr(align(32))]
 pub struct Mutex<T> {
@@ -35,18 +35,19 @@ impl<T> Mutex<T> {
 
 impl<T> Mutex<T> {
     pub fn try_lock(&self) -> Option<MutexGuard<T>> {
-        if percore::is_mmu_ready() {
+        let core = affinity();
+        if is_mmu_ready() {
             if !self.lock.compare_and_swap(false, true, Ordering::SeqCst) {
-                self.owner.store(percore::getcpu(), Ordering::SeqCst);
+                self.owner.store(getcpu(), Ordering::SeqCst);
                 Some(MutexGuard { lock: &self })
             } else {
                 None
             }
         } else {
-            assert!(affinity() == 0);
+            assert!(core == 0);
             if !self.lock.load(Ordering::Relaxed) {
                 self.lock.store(true, Ordering::Relaxed);
-                self.owner.store(percore::getcpu(), Ordering::Relaxed);
+                self.owner.store(getcpu(), Ordering::Relaxed);
                 Some(MutexGuard { lock: &self })
             } else {
                 None
@@ -67,17 +68,17 @@ impl<T> Mutex<T> {
 
     fn unlock(&self) {
         let core = affinity();
-        if percore::is_mmu_ready() {
-            if self.owner.load(Ordering::Acquire) == core {
-                self.owner.store(usize::max_value(), Ordering::Release);
+        if is_mmu_ready() {
+            if self.owner.load(Ordering::SeqCst) == core {
+                self.owner.store(usize::max_value(), Ordering::SeqCst);
                 self.lock.store(false, Ordering::SeqCst);
-                percore::putcpu(core);
+                putcpu(core);
             }
         } else {
             assert!(core == 0);
             self.owner.store(usize::max_value(), Ordering::Relaxed);
             self.lock.store(false, Ordering::Relaxed);
-            percore::putcpu(core);
+            putcpu(core);
         }
     }
 

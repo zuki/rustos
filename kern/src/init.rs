@@ -1,7 +1,7 @@
 use aarch64::*;
 
 use core::mem::zeroed;
-use core::ptr::write_volatile;
+use core::ptr::{read_volatile, write_volatile};
 
 mod oom;
 mod panic;
@@ -17,7 +17,7 @@ global_asm!(include_str!("init/vectors.s"));
 //
 // 大前提 (チェックすること):
 //   _start1/2(), _kinit1/2(), switch_to_el1/2() は
-//     スタックを使ってあいけないshould NOT use stack!
+//     スタックを使ってはいけない
 //   例えば, #[no_stack] が便利だろう ..
 //
 // そのため、debugビルドはサポートしていない!
@@ -137,27 +137,34 @@ unsafe fn kmain2() -> ! {
     // Lab 5 1.A
     let core = MPIDR_EL1.get_value(MPIDR_EL1::Aff0);
     let spinning = SPINNING_BASE.add(core as usize);
+    //write_volatile(spinning, zeroed());
     spinning.write_volatile(0);
     VMM.wait();
     info!("core {} started", core);
-
     SCHEDULER.start()
 }
 
 /// `init::start2` のアドレスを各自のスピニングアドレスに
-/// 書き込むことによりappコアを起床させ、`sev()`でイベントを
-/// 送信する.
+/// 書き込み、`sev()`でイベントを送信することにより
+/// appコアを起床させる.
 pub unsafe fn initialize_app_cores() {
     // Lab 5 1.A
+    //asm::clear_data_cache();
+
     for core in 1..NCORES {
         let spinning = SPINNING_BASE.add(core);
+        //write_volatile(spinning, start2 as usize);
         spinning.write_volatile(start2 as usize);
+        //debug!("spinning {} at {:?} is {}", core, spinning, read_volatile(spinning));
     }
 
-    asm::sev();
+    //asm::clear_data_cache();
+    aarch64::sev();
+    //asm::dmb();
 
     for core in 1..NCORES {
         let spinning = SPINNING_BASE.add(core);
+        //while read_volatile(spinning) != 0 {}
         while spinning.read_volatile() != 0 {}
     }
 }
