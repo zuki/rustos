@@ -140,8 +140,8 @@ unsafe fn kmain2() -> ! {
     //write_volatile(spinning, zeroed());
     spinning.write_volatile(0);
     VMM.wait();
-    info!("core {} started", core);
-    SCHEDULER.start()
+    //info!("core {} started", core);
+    SCHEDULER.start();
 }
 
 /// `init::start2` のアドレスを各自のスピニングアドレスに

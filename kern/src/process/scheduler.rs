@@ -9,14 +9,13 @@ use core::mem;
 use core::time::Duration;
 
 use aarch64::*;
-use pi::local_interrupt::{LocalInterrupt, LocalController};
+use pi::local_interrupt::{LocalInterrupt, LocalController, local_tick_in};
 use smoltcp::time::Instant;
 
 use crate::mutex::Mutex;
 use crate::net::uspi::TKernelTimerHandle;
 use crate::param::*;
-use crate::percore;
-//use crate::percore::{get_preemptive_counter, is_mmu_ready, local_irq};
+use crate::percore::{get_preemptive_counter, is_mmu_ready, local_irq};
 use crate::process::{Id, Process, State};
 //use crate::traps::irq::GlobalIrq;
 use crate::traps::irq::IrqHandlerRegistry;
@@ -109,12 +108,10 @@ impl GlobalScheduler {
     /// 使ってユーザ空間のプロセスの実行を開始する。このメソッドは
     /// 通常の条件では復帰しない。
     pub fn start(&self) -> ! {
-        let core = affinity();
+        //self.initialize_global_timer_interrupt();
 
-        //let mut tf = Box::new(TrapFrame::default());
-        //self.critical(|scheduler| scheduler.switch_to(&mut tf));
 
-        if core == 0 {
+        if affinity() == 0 {
             self.initialize_global_timer_interrupt();
         }
         self.initialize_local_timer_interrupt();
@@ -122,14 +119,10 @@ impl GlobalScheduler {
         let mut tf = Box::new(TrapFrame::default());
         self.critical(|scheduler| scheduler.switch_to(&mut tf));
 
-        //trace!("start [{}]: tf\n{:?}", affinity(), tf);
-        //let old_sp = KERN_STACK_BASE - KERN_STACK_SIZE * core as usize;
+        //kprintln!("tf\n{:?}", tf);
+        // 次のページを計算してspにセットする
         let mut cur_sp = SP.get();
-        //debug!("[{}] cur_sp: 0x{:x}, tf: {:?}", core, cur_sp, tf);
-        // FIXME: ユーザプロセスのレジスタはさわらないが「カーネル
-        // スタックにコピーされたトラップフレームのアドレスを SPに設定」
-        // ではない。ただし、x28を使うとパニックになる。また、tfに
-        // x28, x29はセットされていない。
+
         unsafe {
             asm!("mov x28, $0
                   mov x29, $1
@@ -138,10 +131,11 @@ impl GlobalScheduler {
                  :: "volatile");
             asm!("bl context_restore" :::: "volatile");
             asm!("mov $0, x29" : "=r"(cur_sp) ::: "volatile");
-            asm!("ldp x28, x29, [sp], #16
-                  ldp lr, xzr, [sp], #16
+            asm!("ldp x28, x29, [SP], #16
+                  ldp lr,  xzr, [SP], #16
                   mov sp, $0"
-                :: "r"(cur_sp) :: "volatile");
+                 :: "r"(cur_sp) :: "volatile");
+
             eret();
         }
 
@@ -168,29 +162,27 @@ impl GlobalScheduler {
     /// 発火すように設定する必要がある.
     pub fn initialize_local_timer_interrupt(&self) {
         // Lab 5 2.C
-        percore::local_irq().register(
-            LocalInterrupt::CNTPNSIRQ,
-            Box::new(|tf| {
-                trace!("[{}] tick", affinity());
-                pi::local_interrupt::local_tick_in(affinity(), TICK);
+        let mut controller = LocalController::new(affinity());
+        controller.enable_local_timer();
+        
+        local_irq().register(
+	    LocalInterrupt::CNTPNSIRQ, 
+      	    Box::new(|tf| {
+                local_tick_in(affinity(), TICK);
                 SCHEDULER.switch(State::Ready, tf);
             }),
         );
 
-        let core = affinity();
-        pi::local_interrupt::local_tick_in(core, TICK);
-        let mut local_controller = LocalController::new(core);
-        local_controller.enable_local_timer();
-    }
-
+        controller.tick_in(TICK);
+    } 
+	
     /// スケジューラを初期化してユーザ空間プロセスをスケジューラに追加する.
     pub unsafe fn initialize(&self) {
-        let scheduler = Scheduler::new();
+        let mut scheduler = Scheduler::new();
         *self.0.lock() = Some(scheduler);
 
         for _ in 0..4 {
             let p = Process::load("/fib").expect("load /fib");
-            //scheduler.add(p);
             self.add(p);
         }
     }

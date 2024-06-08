@@ -112,7 +112,7 @@ impl LocalController {
         // See timer: 3.1 to 3.3
         let freq = unsafe { CNTFRQ_EL0.get() };
         let fire = (freq / 1_000) * t.as_millis() as u64;
-        unsafe {CNTP_TVAL_EL0.set(CNTP_TVAL_EL0::TVAL & fire) };
+        unsafe {CNTP_TVAL_EL0.set(fire) };
     }
 }
 

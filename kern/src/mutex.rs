@@ -4,7 +4,7 @@ use core::ops::{Deref, DerefMut, Drop};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use aarch64::affinity;
 
-use crate::percore::{is_mmu_ready, getcpu, putcpu};
+use crate::percore::{getcpu, putcpu, is_mmu_ready};
 
 #[repr(align(32))]
 pub struct Mutex<T> {
@@ -47,7 +47,7 @@ impl<T> Mutex<T> {
             assert!(core == 0);
             if !self.lock.load(Ordering::Relaxed) {
                 self.lock.store(true, Ordering::Relaxed);
-                self.owner.store(getcpu(), Ordering::Relaxed);
+                self.owner.store(core, Ordering::Relaxed);
                 Some(MutexGuard { lock: &self })
             } else {
                 None
@@ -69,16 +69,13 @@ impl<T> Mutex<T> {
     fn unlock(&self) {
         let core = affinity();
         if is_mmu_ready() {
-            if self.owner.load(Ordering::SeqCst) == core {
-                self.owner.store(usize::max_value(), Ordering::SeqCst);
-                self.lock.store(false, Ordering::SeqCst);
-                putcpu(core);
-            }
+            self.owner.store(usize::max_value(), Ordering::SeqCst);
+            putcpu(core);
+            self.lock.compare_and_swap(true, false, Ordering::SeqCst);
         } else {
             assert!(core == 0);
             self.owner.store(usize::max_value(), Ordering::Relaxed);
             self.lock.store(false, Ordering::Relaxed);
-            putcpu(core);
         }
     }
 

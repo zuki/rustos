@@ -6,8 +6,6 @@ use volatile::{ReadVolatile, Volatile};
 
 /// ARMシステムタイマーレジスタの基底アドレス.
 const TIMER_REG_BASE: usize = IO_BASE + 0x3000;
-// タイマー周波数: 1MHz
-//const TIMER_FREQ: u64 = 1_000_000;
 
 #[repr(C)]
 #[allow(non_snake_case)]
@@ -47,7 +45,7 @@ impl Timer {
         let now = self.registers.CLO.read();
         let fire = now.wrapping_add(t.as_micros() as u32);
         self.registers.COMPARE[1].write(fire);
-        self.registers.CS.write(0b10);
+        self.registers.CS.write(1u32 << 1);
     }
 }
 

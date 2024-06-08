@@ -3212,3 +3212,33 @@ PID [3] fib(20) = 10946 (765µs)
 PID [4] fib(20) = 10946 (761µs)
 QEMU: Terminated
 ```
+
+# lab5, フェーズ1が実機で動かない
+
+## 6/5時点の知見
+
+- 実機が動かなくなったのはlab5, phase1, subphase Bから
+- QEMUではTICKを10ミリ秒にするとエラーが発生する
+- lab5のmergeもれはなかった
+
+## mutex周りの問題だった模様だが詳細は不明
+
+- フェーズ1、サブフェーズA
+
+![lab5_1_a](images/lab5_1_a.png)
+
+- フェーズ1、サブフェーズB
+
+![lab5_1_b](images/lab5_1_b.png)
+
+- フェーズ1、サブフェーズC コア1つ
+
+![lab5_p1_1_core](images/lab5_p1_1_core.png)
+
+- フェーズ1、サブフェーズC コア4つ
+
+![lab5_p1_4_core](images/lab5_p1_4_core.png)
+
+- フェーズ1、サブフェーズC 別プログラム4つ
+
+![lab5_p1_fib](images/lab5_p1_fib.png)
