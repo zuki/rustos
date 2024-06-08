@@ -37,8 +37,8 @@ impl<T> Mutex<T> {
     pub fn try_lock(&self) -> Option<MutexGuard<T>> {
         let core = affinity();
         if is_mmu_ready() {
-            if !self.lock.compare_and_swap(false, true, Ordering::AcqRel) {
-                self.owner.store(getcpu(), Ordering::Release);
+            if !self.lock.compare_and_swap(false, true, Ordering::SeqCst) {
+                self.owner.store(getcpu(), Ordering::SeqCst);
                 Some(MutexGuard { lock: &self })
             } else {
                 None
@@ -76,11 +76,12 @@ impl<T> Mutex<T> {
                 putcpu(core);
             }
         */
-            putcpu(self.owner.load(Ordering::Acquire));
-            self.lock.compare_and_swap(true, false, Ordering::AcqRel);
+            self.owner.store(usize::max_value(), Ordering::SeqCst);
+            putcpu(core);
+            self.lock.compare_and_swap(true, false, Ordering::SeqCst);
         } else {
             assert!(core == 0);
-            //self.owner.store(usize::max_value(), Ordering::Relaxed);
+            self.owner.store(usize::max_value(), Ordering::Relaxed);
             self.lock.store(false, Ordering::Relaxed);
             //putcpu(core);
         }

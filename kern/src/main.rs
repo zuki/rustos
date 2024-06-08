@@ -57,7 +57,7 @@ extern "C" {
 
 unsafe fn kmain() -> ! {
     crate::logger::init_logger();
-/*
+  
     info!(
         "text beg: {:016x}, end: {:016x}",
         &__text_beg as *const _ as u64, &__text_end as *const _ as u64
@@ -66,7 +66,7 @@ unsafe fn kmain() -> ! {
         "bss  beg: {:016x}, end: {:016x}",
         &__bss_beg as *const _ as u64, &__bss_end as *const _ as u64
     );
-*/
+  
     ALLOCATOR.initialize();
     FILESYSTEM.initialize();
     VMM.initialize();
