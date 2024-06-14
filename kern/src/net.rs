@@ -238,12 +238,13 @@ impl EthernetDriver {
         None
     }
 
-    /// Finds a socket with a `SocketHandle`.
+    /// `SocketHandle` を持つソケットを検索する.
     pub fn get_socket(&mut self, handle: SocketHandle) -> SocketRef<'_, TcpSocket> {
         self.socket_set.get::<TcpSocket>(handle)
     }
 
-    /// This function creates a new TCP socket, adds it to the internal socket
+    /// 新規TCPソケットを作成して内部ソケットセットに追加し、
+    /// 新規ソケットの`SocketHandle`を返す
     /// set, and returns the `SocketHandle` of the new socket.
     pub fn add_socket(&mut self) -> SocketHandle {
         let rx_buffer = TcpSocketBuffer::new(vec![0; 16384]);
@@ -252,12 +253,12 @@ impl EthernetDriver {
         self.socket_set.add(tcp_socket)
     }
 
-    /// Releases a socket from the internal socket set.
+    /// 内部ソケットセットからソケットを解放する.
     pub fn release(&mut self, handle: SocketHandle) {
         self.socket_set.release(handle);
     }
 
-    /// Prunes the internal socket set.
+    /// 内部ソケットセットを削除する.
     pub fn prune(&mut self) {
         self.socket_set.prune();
     }
@@ -320,8 +321,8 @@ impl GlobalEthernetDriver {
             .add_socket()
     }
 
-    /// Enters a critical region and execute the provided closure with a mutable
-    /// reference to the socket.
+    /// クリティカルリージョンに入り、ソケットへの可変参照を持つ
+    /// 指定されたクロージャを実行する
     pub fn with_socket<F, R>(&self, handle: SocketHandle, f: F) -> R
     where
         F: FnOnce(&mut SocketRef<'_, TcpSocket>) -> R,
@@ -335,8 +336,8 @@ impl GlobalEthernetDriver {
         f(&mut socket)
     }
 
-    /// Enters a critical region and execute the provided closure with a mutable
-    /// reference to the inner ethernet driver.
+    /// クリティカルリージョンに入り、内部ethernetドライバへの可変参照を持つ
+    /// 指定されたクロージャを実行する
     pub fn critical<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&mut EthernetDriver) -> R,

@@ -320,6 +320,7 @@ impl Scheduler {
         match self.current_process(tf) {
             Some(index) => {
                 let mut process = self.processes.remove(index).unwrap();
+                self.release_process_resources(tf);
                 process.state = State::Dead;
                 trace!("[{}]: kill pid={}", affinity(), process.context.tpidr);
                 Some(process.context.tpidr)
@@ -346,10 +347,23 @@ impl Scheduler {
         }
     }
 
-    /// Releases all process resources held by the current process such as sockets.
+    /// カレントプロセスが保持するソケットなどのプロセスリソースをすべて解放する.
     fn release_process_resources(&mut self, tf: &mut TrapFrame) {
         // Lab 5 2.C
-        unimplemented!("release_process_resources")
+        match self.current_process(tf) {
+            Some(index) => {
+                let mut process = self.processes.remove(index).unwrap();
+                for handle in process.sockets.iter_mut() {
+                    ETHERNET.critical(|driver| {
+                        driver.get_socket(*handle).close();
+                        driver.release(*handle);
+                        driver.prune();
+                    });
+                }
+                ()
+            }
+            None => (),
+        }
     }
 
     /// トラップフレームに保存されているtpidrに対応するプロセスを見つけつ.

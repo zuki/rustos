@@ -201,6 +201,8 @@ pub fn usDelay(nMicroSeconds: u32) {
 #[no_mangle]
 pub unsafe fn ConnectInterrupt(nIRQ: u32, pHandler: TInterruptHandler, pParam: *mut c_void) {
     // Lab 5 2.B
+    unimplemented!("FIXME later");
+/*
     assert!(nIRQ != Interrupt::Timer3 as u32 && nIRQ != Interrupt::Usb as u32, "invalide nRIQ");
     assert!(pHandler.is_some(), "pHandler is None");
 
@@ -219,6 +221,7 @@ pub unsafe fn ConnectInterrupt(nIRQ: u32, pHandler: TInterruptHandler, pParam: *
         }
         _ => {}
     }
+*/
 }
 
 /// `uspi_trace!`マクロを使ってUSPiからのログメッセージを書き出す.

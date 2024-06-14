@@ -1,13 +1,13 @@
 #![feature(new_uninit)]
 use alloc::boxed::Box;
-//use alloc::vec::Vec;
+use alloc::vec::Vec;
 use core::mem;
 //use shim::io;
 use shim::path::Path;
 use fat32::traits::{Entry, File, FileSystem};
 
 use aarch64::*;
-//use smoltcp::socket::SocketHandle;
+use smoltcp::socket::SocketHandle;
 
 use crate::{param::*, FILESYSTEM};
 use crate::process::State;
@@ -34,8 +34,8 @@ pub struct Process {
     /// プロセスのスケジューリング状態.
     pub state: State,
     // Lab 5 2.C
-    // Socket handles held by the current process
-    // pub sockets: Vec<SocketHandle>,
+    /// カレントプロセスが保持するSocketハンドル
+    pub sockets: Vec<SocketHandle>,
 }
 
 impl Process {
@@ -115,6 +115,7 @@ impl Process {
             context: Box::new(TrapFrame::default()),
             vmap,
             state: State::Ready,
+            sockets: Vec::new(),
         })
 
     }
