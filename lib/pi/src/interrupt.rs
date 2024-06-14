@@ -110,9 +110,10 @@ impl Controller {
         }
     }
 
-    /// Enables the interrupt as FIQ interrupt
+    /// USB割り込みをFIQ割り込みとして有効化
     pub fn enable_fiq(&mut self, _int: Interrupt) {
         // Lab 5 2.B
-        unimplemented!("enable_fiq")
+        self.disable(Interrupt::Usb);
+        self.registers.FIQ_CONTROL.write(0x89 as u32);  // USB: 9 + enable flag
     }
 }

@@ -7,7 +7,7 @@ pub mod irq;
 
 pub use self::frame::TrapFrame;
 
-use aarch64::affinity;
+use aarch64::{affinity, enable_fiq_interrupt, disable_fiq_interrupt};
 use pi::interrupt::{Controller, Interrupt};
 use pi::local_interrupt::{LocalController, LocalInterrupt};
 
@@ -58,29 +58,35 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame, far
                     tf.elr += 4;
                 }
                 Syndrome::Svc(n) => {
+                    enable_fiq_interrupt();
                     //kprintln!("Syndrome::Svc({})", n);
                     handle_syscall(n as u16, tf);
+                    disable_fiq_interrupt();
                 }
                 s => panic!("Unexpected syndrome: {:?}\ninfo: {:x?}\nesr : 0x{:08X}\nfar : 0x{:016X}\ntf:\n{:?}", s, info, esr, far, tf),
             }
         }
         Kind::Irq => {
-            let core = affinity();
-         /*
+            enable_fiq_interrupt();
             let controller = Controller::new();
             for int in Interrupt::iter() {
                 if controller.is_pending(int) {
                     //kprintln!("IRQ: {:?}", *int as u32);
-                    GLOABAL_IRQ.invoke(int, tf);
+                    GLOBAL_IRQ.invoke(int, tf);
                 }
             }
-         */
+            disable_fiq_interrupt();
+
+            let core = affinity();
             let controller = LocalController::new(core);
             for int in LocalInterrupt::iter() {
                 if controller.is_pending(int) {
                     percore::local_irq().invoke(int, tf);
                 }
             }
+        }
+        Kind::Fiq => {
+            GLOBAL_IRQ.invoke(Interrupt::Usb, tf);
         }
         _ => {
             //

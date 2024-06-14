@@ -1,10 +1,11 @@
 #![allow(non_snake_case)]
 
 use alloc::boxed::Box;
-use alloc::string::String;
+//use alloc::string::String;
+use core::slice::from_ref;
+use core::str::from_utf8;
 use core::alloc::{GlobalAlloc, Layout};
 use core::ffi::c_void;
-use core::slice;
 use core::time::Duration;
 
 use pi::interrupt::{Controller, Interrupt};
@@ -14,7 +15,7 @@ use smoltcp::wire::EthernetAddress;
 use crate::mutex::Mutex;
 use crate::net::Frame;
 use crate::traps::irq::IrqHandlerRegistry;
-use crate::ALLOCATOR;
+use crate::{ALLOCATOR, GLOBAL_IRQ, FIQ};
 
 const DEBUG_USPI: bool = false;
 pub macro uspi_trace {
@@ -44,23 +45,23 @@ mod inner {
     pub struct USPi(());
 
     extern "C" {
-        /// Returns 0 on failure
+        /// 失敗時に0を返す
         fn USPiInitialize() -> i32;
-        /// Check if the ethernet controller is available.
-        /// Returns != 0 if available
+        /// ethernetコントローラが利用可能化チェックする.
+        /// 利用可能な場合は != 0 を返す
         fn USPiEthernetAvailable() -> i32;
         fn USPiGetMACAddress(Buffer: &mut [u8; 6]);
-        /// Returns != 0 if link is up
+        /// リンクが上がっている場合  != 0 を返す
         fn USPiEthernetIsLinkUp() -> i32;
-        /// Returns 0 on failure
+        /// 失敗時に0を返す
         fn USPiSendFrame(pBuffer: *const u8, nLength: u32) -> i32;
-        /// pBuffer must have size USPI_FRAME_BUFFER_SIZE
-        /// Returns 0 if no frame is available or on failure
+        /// pBufferのサイズはUSPI_FRAME_BUFFER_SIZEデなければならない
+        /// 利用可能なフレームがない、または失敗の場合は 0を返す
         fn USPiReceiveFrame(pBuffer: *mut u8, pResultLength: *mut u32) -> i32;
-        /// Returns a timer handle (0 on failure)
+        /// タイマーハンドルを返す（失敗時は0を返す）
         fn TimerStartKernelTimer(
             pThis: TKernelTimerHandle,
-            nDelay: c_uint, // in HZ units
+            nDelay: c_uint, // HZ 単位
             pHandler: TKernelTimerHandler,
             pParam: *mut core::ffi::c_void,
             pContext: *mut core::ffi::c_void,
@@ -71,29 +72,29 @@ mod inner {
     impl !Sync for USPi {}
 
     impl USPi {
-        /// The caller should assure that this function is called only once
-        /// during the lifetime of the kernel.
+        /// callerはこの関数をカーネルの生存期間に1度だけ
+        /// 呼び出す必要がある
         pub unsafe fn initialize() -> Self {
             assert!(USPiInitialize() != 0);
             USPi(())
         }
 
-        /// Returns whether ethernet is available on RPi
+        /// RPiでethernetが利用可能であるか否かを返す
         pub fn is_eth_available(&mut self) -> bool {
             unsafe { USPiEthernetAvailable() != 0 }
         }
 
-        /// Returns MAC address of RPi
+        /// RPiのMACアドレスを返す
         pub fn get_mac_address(&mut self, buf: &mut [u8; 6]) {
             unsafe { USPiGetMACAddress(buf) }
         }
 
-        /// Checks whether RPi ethernet link is up or not
+        /// RPiでethernetリンクが上がっているか否かをチェックする
         pub fn is_eth_link_up(&mut self) -> bool {
             unsafe { USPiEthernetIsLinkUp() != 0 }
         }
 
-        /// Sends an ethernet frame using USPiSendFrame
+        /// USPiSendFrameを使ってethernetフレームを送信する
         pub fn send_frame(&mut self, frame: &Frame) -> Option<i32> {
             trace!("Send frame {:?}", frame);
             let result = unsafe { USPiSendFrame(frame.as_ptr(), frame.len()) };
@@ -103,7 +104,7 @@ mod inner {
             }
         }
 
-        /// Receives an ethernet frame using USPiRecvFrame
+        /// USPiRecvFrameを使ってethernetフレームを受診する
         pub fn recv_frame<'a>(&mut self, frame: &mut Frame) -> Option<i32> {
             let mut result_len = 0;
             trace!("Recv frame {:?}", frame);
@@ -115,7 +116,7 @@ mod inner {
             }
         }
 
-        /// A wrapper function to `TimerStartKernelHandler`.
+        /// `TimerStartKernelHandler`のラッパー関数
         pub fn start_kernel_timer(&mut self, delay: Duration, handler: TKernelTimerHandler) {
             trace!(
                 "Core {}, delay {:?}, handler {:?}",
@@ -144,63 +145,93 @@ mod inner {
 
 pub use inner::USPi;
 
-unsafe fn layout(size: usize) -> Layout {
-    Layout::from_size_align_unchecked(size + core::mem::size_of::<usize>(), 16)
-}
-
 #[no_mangle]
 fn malloc(size: u32) -> *mut c_void {
     // Lab 5 2.B
-    unimplemented!("malloc")
+    let alloc_size = size as usize + core::mem::size_of::<Layout>();
+    unsafe {
+        let layout = Layout::from_size_align_unchecked(alloc_size, 16);
+        let ptr = ALLOCATOR.alloc(layout) as *mut Layout;
+        ptr.write(layout);
+        ptr.add(1) as *mut c_void
+    }
 }
 
 #[no_mangle]
 fn free(ptr: *mut c_void) {
     // Lab 5 2.B
-    unimplemented!("free")
+    unsafe {
+        let layout_ptr = (ptr as *mut Layout).sub(1);
+        let layout = layout_ptr.read();
+        ALLOCATOR.dealloc(layout_ptr as *mut u8, layout);
+    }
 }
 
 #[no_mangle]
 pub fn TimerSimpleMsDelay(nMilliSeconds: u32) {
     // Lab 5 2.B
-    unimplemented!("TimerSimpleMsDelay")
+    spin_sleep(Duration::from_millis(nMilliSeconds as u64));
 }
 
 #[no_mangle]
 pub fn TimerSimpleusDelay(nMicroSeconds: u32) {
     // Lab 5 2.B
-    unimplemented!("TimerSimpleusDelay")
+    spin_sleep(Duration::from_micros(nMicroSeconds as u64));
 }
 
 #[no_mangle]
 pub fn MsDelay(nMilliSeconds: u32) {
     // Lab 5 2.B
-    unimplemented!("MsDelay")
+    spin_sleep(Duration::from_millis(nMilliSeconds as u64));
 }
 
 #[no_mangle]
 pub fn usDelay(nMicroSeconds: u32) {
     // Lab 5 2.B
-    unimplemented!("usDelay")
+    spin_sleep(Duration::from_micros(nMicroSeconds as u64));
 }
 
-/// Registers `pHandler` to the kernel's IRQ handler registry.
-/// When the next time the kernel receives `nIRQ` signal, `pHandler` handler
-/// function should be invoked with `pParam`.
+/// `pHandler`をカーネルのIRQハンドラレジストリに登録する.
+/// 次回カーネルが`nIRQ`シグナルを受診した際、ハンドラ関数
+/// `pHandler`が`pPrama`で実行される。
 ///
-/// If `nIRQ == Interrupt::Usb`, register the handler to FIQ interrupt handler
-/// registry. Otherwise, register the handler to the global IRQ interrupt handler.
+/// `nIRQ == Interrupt::Usb`の場合はFIQ割り込みハンドラレジスタに
+/// 登録する。それ以外の場合は、グローバルIRQ割り込みハンドラに
+/// ハンドラを登録する。
 #[no_mangle]
 pub unsafe fn ConnectInterrupt(nIRQ: u32, pHandler: TInterruptHandler, pParam: *mut c_void) {
     // Lab 5 2.B
-    unimplemented!("ConnectInterrupt")
+    assert!(nIRQ != Interrupt::Timer3 as u32 && nIRQ != Interrupt::Usb as u32, "invalide nRIQ");
+    assert!(pHandler.is_some(), "pHandler is None");
+
+    let handler = pHandler.unwrap();
+
+    match Interrupt::from(nIRQ as usize) {
+        Interrupt::Usb => {
+            let mut controller = Controller::new();
+            controller.enable_fiq(Interrupt::Usb);
+            FIQ.register((), Box::new(|tf| { handler(pParam) }));
+        }
+        Interrupt::Timer3 => {
+            let mut controller = Controller::new();
+            controller.enable(Interrupt::Timer3);
+            GLOBAL_IRQ.register(Interrupt::Timer3, Box::new(|tf| { handler(pParam) }));
+        }
+        _ => {}
+    }
 }
 
-/// Writes a log message from USPi using `uspi_trace!` macro.
+/// `uspi_trace!`マクロを使ってUSPiからのログメッセージを書き出す.
 #[no_mangle]
 pub unsafe fn DoLogWrite(_pSource: *const u8, _Severity: u32, pMessage: *const u8) {
     // Lab 5 2.B
-    unimplemented!("DoLogWrite")
+    let msg_str: &[u8] = from_ref(&*pMessage);
+    let message: &str = match from_utf8(msg_str) {
+        Ok(s) => s,
+        Err(_) => "convert error",
+    };
+    uspi_trace!("{}", message);
+
 }
 
 #[no_mangle]
@@ -211,7 +242,17 @@ pub fn DebugHexdump(_pBuffer: *const c_void, _nBufLen: u32, _pSource: *const u8)
 #[no_mangle]
 pub unsafe fn uspi_assertion_failed(pExpr: *const u8, pFile: *const u8, nLine: u32) {
     // Lab 5 2.B
-    unimplemented!("uspi_assertion_failed")
+    let expr_str: &[u8] = from_ref(&*pExpr);
+    let expression: &str = match from_utf8(expr_str) {
+        Ok(s) => s,
+        Err(_) => "expression",
+    };
+    let file_str: &[u8] = from_ref(&*pFile);
+    let file: &str = match from_utf8(file_str) {
+        Ok(s) => s,
+        Err(_) => "Unknown file",
+    };
+    uspi_trace!("{} [{}]: assert failed: {}", file, nLine, expression);
 }
 
 pub struct Usb(pub Mutex<Option<USPi>>);

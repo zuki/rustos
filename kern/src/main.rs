@@ -1,4 +1,5 @@
 #![feature(alloc_error_handler)]
+#![feature(allocator_api)]
 #![feature(const_fn)]
 #![feature(decl_macro)]
 #![feature(asm)]
@@ -37,6 +38,7 @@ use net::GlobalEthernetDriver;
 use process::GlobalScheduler;
 use traps::irq::{Fiq, GlobalIrq};
 use vm::VMManager;
+use aarch64::{enable_fiq_interrupt, disable_fiq_interrupt};
 
 #[cfg_attr(not(test), global_allocator)]
 pub static ALLOCATOR: Allocator = Allocator::uninitialized();
@@ -57,7 +59,7 @@ extern "C" {
 
 unsafe fn kmain() -> ! {
     crate::logger::init_logger();
-  
+
     info!(
         "text beg: {:016x}, end: {:016x}",
         &__text_beg as *const _ as u64, &__text_end as *const _ as u64
@@ -66,11 +68,18 @@ unsafe fn kmain() -> ! {
         "bss  beg: {:016x}, end: {:016x}",
         &__bss_beg as *const _ as u64, &__bss_end as *const _ as u64
     );
-  
+
     ALLOCATOR.initialize();
     FILESYSTEM.initialize();
     VMM.initialize();
     SCHEDULER.initialize();
+    enable_fiq_interrupt();
+    USB.initialize();
+    ETHERNET.initialize();
+    assert!(USB.is_eth_available(), "ethernet is disable");
+    while !USB.is_eth_link_up() {}
+    disable_fiq_interrupt();
+
     //debug!("1");
     init::initialize_app_cores();
     VMM.wait();

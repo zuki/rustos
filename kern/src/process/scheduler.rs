@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
 use alloc::vec::Vec;
+use pi::timer::current_time;
 
 //use core::borrow::Borrow;
 use core::ffi::c_void;
@@ -14,12 +15,14 @@ use smoltcp::time::Instant;
 
 use crate::mutex::Mutex;
 use crate::net::uspi::TKernelTimerHandle;
+use crate::net::GlobalEthernetDriver;
 use crate::param::*;
 use crate::percore::{get_preemptive_counter, is_mmu_ready, local_irq};
 use crate::process::{Id, Process, State};
 //use crate::traps::irq::GlobalIrq;
 use crate::traps::irq::IrqHandlerRegistry;
 use crate::traps::TrapFrame;
+use crate::GLOBAL_IRQ;
 use crate::{ETHERNET, USB};
 
 //use crate::traps::irq;
@@ -117,7 +120,9 @@ impl GlobalScheduler {
         self.initialize_local_timer_interrupt();
 
         let mut tf = Box::new(TrapFrame::default());
+        enable_fiq_interrupt();
         self.critical(|scheduler| scheduler.switch_to(&mut tf));
+        disable_fiq_interrupt();
 
         //kprintln!("tf\n{:?}", tf);
         // 次のページを計算してspにセットする
@@ -152,8 +157,8 @@ impl GlobalScheduler {
     /// 1 秒後に `poll_ethernet` を起動するタイマーハンドラを
     /// `Usb::start_kernel_timer` に登録する.
     pub fn initialize_global_timer_interrupt(&self) {
-        if affinity() != 0 {
-            return;
+        if affinity() == 0 {
+            USB.start_kernel_timer(Duration::from_secs(1), Some(poll_ethernet));
         }
     }
 
@@ -164,9 +169,9 @@ impl GlobalScheduler {
         // Lab 5 2.C
         let mut controller = LocalController::new(affinity());
         controller.enable_local_timer();
-        
+
         local_irq().register(
-	    LocalInterrupt::CNTPNSIRQ, 
+	        LocalInterrupt::CNTPNSIRQ,
       	    Box::new(|tf| {
                 local_tick_in(affinity(), TICK);
                 SCHEDULER.switch(State::Ready, tf);
@@ -174,8 +179,8 @@ impl GlobalScheduler {
         );
 
         controller.tick_in(TICK);
-    } 
-	
+    }
+
     /// スケジューラを初期化してユーザ空間プロセスをスケジューラに追加する.
     pub unsafe fn initialize(&self) {
         let mut scheduler = Scheduler::new();
@@ -208,11 +213,14 @@ impl GlobalScheduler {
 
 }
 
-/// Poll the ethernet driver and re-register a timer handler using
-/// `Usb::start_kernel_timer`.
+/// Ethernetドライバをポーリングし、`Usb::start_kernel_timer`を使って
+/// タイマーハンドラを再登録する
+/// .
 extern "C" fn poll_ethernet(_: TKernelTimerHandle, _: *mut c_void, _: *mut c_void) {
     // Lab 5 2.B
-    unimplemented!("poll_ethernet")
+    ETHERNET.poll(Instant::from_millis(current_time().as_millis() as i64));
+    let delay = ETHERNET.poll_delay(Instant::from_millis(current_time().as_millis() as i64));
+    USB.start_kernel_timer(delay, Some(poll_ethernet));
 }
 
 /// Internal scheduler struct which is not thread-safe.
@@ -276,7 +284,7 @@ impl Scheduler {
 
     /// 次に切り替えるべきプロセスを見つけ、そのプロセスを `processes`
     /// キューの先頭に移動させ、状態を `Running` に変更し、トラップ
-    /// フレームを `tf` に復元することでコンテキストスイッチを行う。
+    /// フレームを `tf` に復元することでコンテキストスイッチを行う。poll_ethernet
     ///
     /// 切り替えるプロセスがない場合は `None` を返す。そうでない場合は、
     /// 切り替えるプロセスのプロセス IDの `Some` を返す。

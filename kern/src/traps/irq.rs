@@ -1,3 +1,4 @@
+use alloc::alloc::Global;
 use alloc::boxed::Box;
 use core::ops::Index;
 
@@ -116,7 +117,7 @@ impl Index<()> for Fiq {
 
     fn index(&self, _: ()) -> &IrqHandlerMutex {
         // Lab 5 2.B
-        unimplemented!("FIQ Index")
+        &self.0
     }
 }
 
@@ -132,7 +133,7 @@ impl<I, T> IrqHandlerRegistry<I> for T
 where
     T: Index<I, Output = IrqHandlerMutex>,
 {
-    /// 割り込みに対するirqアンドラを登録する.
+    /// 割り込みに対するirqㇵンドラを登録する.
     fn register(&self, int: I, handler: IrqHandler) {
         *(self.index(int).lock()) = Some(handler);
     }

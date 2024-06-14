@@ -1,4 +1,4 @@
-///! Network device that wraps USPi in smoltcp abstraction
+///! smoltcp 抽象化でUSPiをラップするネットワークデバイス
 pub mod uspi;
 
 use alloc::boxed::Box;
@@ -7,7 +7,9 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryInto;
 use core::fmt;
+//use core::net::Ipv4Addr;
 use core::time::Duration;
+use aarch64::affinity;
 
 use smoltcp::iface::{EthernetInterfaceBuilder, NeighborCache};
 use smoltcp::phy::{self, Device, DeviceCapabilities};
@@ -18,17 +20,18 @@ use smoltcp::wire::{IpAddress, IpCidr};
 use crate::mutex::Mutex;
 use crate::param::MTU;
 use crate::USB;
+use crate::percore::get_preemptive_counter;
 
-// We always use owned buffer as internal storage
+// 内部ストレージとして常に独自のバッファを使用する
 pub type SocketSet = smoltcp::socket::SocketSet<'static, 'static, 'static>;
 pub type TcpSocket = smoltcp::socket::TcpSocket<'static>;
 pub type EthernetInterface<T> = smoltcp::iface::EthernetInterface<'static, 'static, 'static, T>;
 
-/// 8-byte aligned `u8` slice.
+/// 8-バイトアラインの `u8` スライス.
 #[repr(align(8))]
 struct FrameBuf([u8; MTU as usize]);
 
-/// A fixed size buffer with length tracking functionality.
+/// 長さ追跡ができる機能を持つ固定サイズのバッファ.
 pub struct Frame {
     buf: Box<FrameBuf>,
     len: u32,
@@ -135,61 +138,104 @@ impl phy::TxToken for TxToken {
     }
 }
 
-/// Creates and returns a new ethernet interface using `UsbEthernet` struct.
+/// `UsbEthernet`構造体を使って新規ethernetインタフェースを作成して返す.
 pub fn create_interface() -> EthernetInterface<UsbEthernet> {
     // Lab 5 2.B
-    unimplemented!("create_interface")
+    let device = UsbEthernet;
+    let hw_addr = USB.get_eth_addr();
+    let neighbor_cache = NeighborCache::new(BTreeMap::new());
+    let ip_addrs = [IpCidr::new(IpAddress::v4(192, 168, 10, 110), 24),
+                    IpCidr::new(IpAddress::v4(127, 0, 0, 1), 8)];
+
+    EthernetInterfaceBuilder::new(device)
+        .ethernet_addr(hw_addr)
+        .neighbor_cache(neighbor_cache)
+        .ip_addrs(ip_addrs)
+        .finalize()
 }
 
 const PORT_MAP_SIZE: usize = 65536 / 64;
 
 pub struct EthernetDriver {
-    /// A set of sockets
+    /// ソケットセット
     socket_set: SocketSet,
-    /// Bitmap to track the port usage
+    /// ポートの利用状況を追跡するビットマップ
     port_map: [u64; PORT_MAP_SIZE],
-    /// Internal ethernet interface
+    /// 内部ethernetインタフェース
     ethernet: EthernetInterface<UsbEthernet>,
 }
 
 impl EthernetDriver {
-    /// Creates a fresh ethernet driver.
+    /// 新規ethernetドライバを作成する.
     fn new() -> EthernetDriver {
         // Lab 5 2.B
-        unimplemented!("new")
+        EthernetDriver {
+            socket_set: SocketSet::new(vec![]),
+            port_map: [0_u64; PORT_MAP_SIZE],
+            ethernet: create_interface(),
+        }
     }
 
-    /// Polls the ethernet interface.
-    /// See also `smoltcp::iface::EthernetInterface::poll()`.
+    /// ethernetインタフェースをポーリングする.
+    /// `smoltcp::iface::EthernetInterface::poll()`も参照のこと.
     fn poll(&mut self, timestamp: Instant) {
         // Lab 5 2.B
-        unimplemented!("poll")
+        match self.ethernet.poll(&mut self.socket_set, timestamp) {
+            Ok(_) => {}
+            Err(_) => {}
+        }
     }
 
-    /// Returns an advisory wait time to call `poll()` the next time.
-    /// See also `smoltcp::iface::EthernetInterface::poll_delay()`.
+    /// 次回 `poll()` を呼び出すまでの待機時間を返す.
+    /// `smoltcp::iface::EthernetInterface::poll_delay()`も参照のこと.
     fn poll_delay(&mut self, timestamp: Instant) -> Duration {
         // Lab 5 2.B
-        unimplemented!("poll_delay")
+        match self.ethernet.poll_delay(&mut self.socket_set, timestamp) {
+            Some(duration) => Duration::from_millis(duration.millis),
+            None => Duration::from_millis(0),
+        }
     }
 
-    /// Marks a port as used. Returns `Some(port)` on success, `None` on failure.
+    /// ポートを使用済みとマークする。成功したら`Some(port)`を返し、
+    /// 失敗したら`None`を返す。
     pub fn mark_port(&mut self, port: u16) -> Option<u16> {
         // Lab 5 2.B
-        unimplemented!("mark_port")
+        let idx = port as usize / PORT_MAP_SIZE;
+        let map: u64 = 1_u64 << (port as usize % PORT_MAP_SIZE);
+        if self.port_map[idx] & map != 0 {
+            None
+        } else {
+            self.port_map[idx] |= map;
+            Some(port)
+        }
     }
 
-    /// Clears used bit of a port. Returns `Some(port)` on success, `None` on failure.
+    /// ポートの使用済みビットをクリアする。成功したら`Some(port)`を返し、
+    /// 失敗したら`None`を返す。
     pub fn erase_port(&mut self, port: u16) -> Option<u16> {
         // Lab 5 2.B
-        unimplemented!("erase_port")
+        let idx = port as usize / PORT_MAP_SIZE;
+        let map: u64 = 1_u64 << (port as usize % PORT_MAP_SIZE);
+        if self.port_map[idx] & map != 1 {
+            None
+        } else {
+            self.port_map[idx] &= !map;
+            Some(port)
+        }
     }
 
-    /// Returns the first open port between the ephemeral port range 49152 ~ 65535.
-    /// Note that this function does not mark the returned port.
+    /// エフェメラルポート範囲 45152 - 65535 の最初の空き番号を返す。
+    /// この関数はポートをマークしないことに注意されたい。
     pub fn get_ephemeral_port(&mut self) -> Option<u16> {
         // Lab 5 2.B
-        unimplemented!("get_ephemeral_port")
+        for port in 45152..=65535  {
+            let idx = port / PORT_MAP_SIZE;
+            let map: u64 = 1_u64 << (port % PORT_MAP_SIZE);
+            if self.port_map[idx] & map == 0 {
+                return Some(port as u16);
+            }
+        }
+        None
     }
 
     /// Finds a socket with a `SocketHandle`.
@@ -232,7 +278,14 @@ impl GlobalEthernetDriver {
 
     pub fn poll(&self, timestamp: Instant) {
         // Lab 5 2.B
-        unimplemented!("poll")
+        // FIXME lator
+        if aarch64::affinity() == 0 && get_preemptive_counter() > 0 {
+            self.0
+            .lock()
+            .as_mut()
+            .expect("Uninitialized EthernetDriver")
+            .poll(timestamp)
+        }
     }
 
     pub fn poll_delay(&self, timestamp: Instant) -> Duration {
