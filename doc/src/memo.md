@@ -3242,3 +3242,102 @@ QEMU: Terminated
 - フェーズ1、サブフェーズC 別プログラム4つ
 
 ![lab5_p1_fib](images/lab5_p1_fib.png)
+
+# lab5, p2, sBの実装
+
+- Cのハンドラ`pHandler`をRustで登録する関数
+- `pParam`には呼び出し元の`pThis`が設定されているので必須。
+
+```rust
+pub unsafe fn ConnectInterrupt(nIRQ: u32, pHandler: TInterruptHandler, pParam: *mut c_void) {
+    // Lab 5 2.B
+    match Interrupt::from(nIRQ as usize) {
+        Interrupt::Usb => FIQ.register((), Box::new(|tf| {
+            if let Some(f) = pHandler {
+                f(pParam);
+            }
+        })),
+        (int) => GLOBAL_IRQ.register(int, Box::new(|tf| {
+            if let Some(f) = pHandler {
+                f(pParam);
+            }
+        })),
+    }
+}
+```
+
+このように実装した場合、次のエラーになる。
+
+```bash
+error[E0277]: `*mut core::ffi::c_void` cannot be shared between threads safely
+   --> src/net/uspi.rs:208:44
+    |
+208 |           Interrupt::Usb => FIQ.register((), Box::new(|tf| {
+    |  ____________________________________________^
+209 | |             if let Some(f) = pHandler {
+210 | |                 f(pParam);
+211 | |             }
+212 | |         })),
+    | |__________^ `*mut core::ffi::c_void` cannot be shared between threads safely
+    |
+    = help: the trait `core::marker::Sync` is not implemented for `*mut core::ffi::c_void`
+    = note: required because of the requirements on the impl of `core::marker::Send` for `&*mut core::ffi::c_void`
+    = note: required because it appears within the type `[closure@src/net/uspi.rs:208:53: 212:10 pHandler:&core::option::Option<unsafe extern "C" fn(*mut core::ffi::c_void)>, pParam:&*mut core::ffi::c_void]`
+    = note: required for the cast to the object type `dyn for<'r> core::ops::FnMut(&'r mut traps::frame::TrapFrame) + core::marker::Send`
+```
+
+# USPiのコンパイル
+
+- リンカファイルが無いというエラー発生
+
+```bash
+$ cd ext/uspi/lib
+$ make clean
+$ make
+  CC    uspilibrary.o
+aarch64-linux-gnu-gcc: warning: arm64: linker input file unused because linking not done
+aarch64-linux-gnu-gcc: error: arm64: linker input file not found: No such file or directory
+make: *** [../Rules.mk:69: uspilibrary.o] Error 1
+```
+
+- Linuxのコンパイルに使った環境変数`ARCH=arm64`のためだった。
+- `.bashrc`の該当行を削除して再度実行したら問題なくmakeできた。
+
+```bash
+$ make
+  CC    uspilibrary.o
+  CC    dwhcidevice.o
+  CC    dwhciregister.o
+  CC    dwhcixferstagedata.o
+  CC    usbconfigparser.o
+  CC    usbdevice.o
+usbdevice.c: In function ‘USBDeviceLogWrite’:
+usbdevice.c:594:9: warning: implicit declaration of function ‘DoLogWrite’; did you mean ‘LogWrite’? [-Wimplicit-function-declaration]
+  594 |         DoLogWrite (StringGet (&Source), Severity, StringGet (&Message));
+      |         ^~~~~~~~~~
+      |         LogWrite
+  CC    usbdevicefactory.o
+  CC    usbendpoint.o
+  CC    usbrequest.o
+  CC    usbstandardhub.o
+  CC    devicenameservice.o
+  CC    macaddress.o
+  CC    usbfunction.o
+  CC    smsc951x.o
+  CC    lan7800.o
+  CC    string.o
+  CC    util.o
+  CC    usbmassdevice.o
+  CC    dwhciframeschednper.o
+  CC    dwhciframeschedper.o
+  CC    keymap.o
+  CC    usbkeyboard.o
+  CC    dwhcirootport.o
+  CC    usbmouse.o
+  CC    dwhciframeschednsplit.o
+  CC    usbgamepad.o
+  CC    synchronize.o
+  CC    usbstring.o
+  CC    usbmidi.o
+  AR    libuspi.a
+```
