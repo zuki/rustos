@@ -245,7 +245,6 @@ impl EthernetDriver {
 
     /// 新規TCPソケットを作成して内部ソケットセットに追加し、
     /// 新規ソケットの`SocketHandle`を返す
-    /// set, and returns the `SocketHandle` of the new socket.
     pub fn add_socket(&mut self) -> SocketHandle {
         let rx_buffer = TcpSocketBuffer::new(vec![0; 16384]);
         let tx_buffer = TcpSocketBuffer::new(vec![0; 16384]);
@@ -262,6 +261,12 @@ impl EthernetDriver {
     pub fn prune(&mut self) {
         self.socket_set.prune();
     }
+
+    /// 内部ethernetインタフェースからIPアドレスを返す.
+    pub fn get_ipaddress(&mut self) -> IpAddress {
+        IpAddress::from(self.ethernet.ipv4_addr().unwrap())
+    }
+
 }
 
 /// A thread-safe wrapper for `EthernetDriver`.

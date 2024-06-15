@@ -183,7 +183,7 @@ impl GlobalScheduler {
 
     /// スケジューラを初期化してユーザ空間プロセスをスケジューラに追加する.
     pub unsafe fn initialize(&self) {
-        let mut scheduler = Scheduler::new();
+        let scheduler = Scheduler::new();
         *self.0.lock() = Some(scheduler);
 
         for _ in 0..4 {

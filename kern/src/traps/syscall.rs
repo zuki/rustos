@@ -80,81 +80,164 @@ pub fn sys_getpid(tf: &mut TrapFrame) {
     tf.xn[7] = OsError::Ok as u64;
 }
 
-/// Creates a socket and saves the socket handle in the current process's
-/// socket list.
+/// ソケットを作成してソケットハンドルをカレントプロセスの
+/// ソケットリストに保存する.
 ///
-/// This function does neither take any parameter nor return anything,
-/// except the usual return code that indicates successful syscall execution.
+/// この関数は引数を取らない。
+///
+/// このシステムコールは通常のステータス値に加えてソケットディスクリプタを
+/// 返す。
+///
+/// NOTE: オリジナル注記には「今関数は通常のステータス値以外は何も
+/// 返さない」とあるがソケットディスクリプタを返さないと以後この
+/// ソケットは使えないはずなのでソケットディスクリプタを返す仕様にした
+///
+/// FIXME: SocketHandleの定義は`struct SocketHandle(usize)`である。
+/// self.0をディスクリプタに使いたいがプライベートフィールドで
+/// アクセスできない。ここではprocess.socketsのindexをディスクリプタ
+/// として使うことにした。これは一度pushしたハンドルを削除されなければ
+/// 問題ないが、削除されたら意味をなくしまう。close()システムコールは
+/// 実装しなくても良いとあるので実装しなければ問題ないか?
 pub fn sys_sock_create(tf: &mut TrapFrame) {
     // Lab 5 2.D
-    unimplemented!("sys_sock_create")
+    SCHEDULER.critical(|scheduler| {
+        let process = scheduler.find_process(tf);
+        let handle = ETHERNET.add_socket();
+        process.sockets.push(handle);
+        tf.xn[0] = (process.sockets.len() - 1) as u64;
+    });
+
+    tf.xn[7] = OsError::Ok as u64;
 }
 
-/// Returns the status of a socket.
+/// ソケットのステータスを返す。
 ///
-/// This system call takes a socket descriptor as the first parameter.
+/// このシステムコールはソケットディスクリプタを第１引数として取る。
 ///
-/// In addition to the usual status value, this system call returns four boolean
-/// values that describes the status of the queried socket.
+/// 通常のステータス値に加え、このシステムコールはキューイング
+/// されているソケットのステータスを記述する４つのブール値を返す。
 ///
 /// - x0: is_active
 /// - x1: is_listening
 /// - x2: can_send
 /// - x3: can_recv
 ///
-/// # Errors
-/// This function returns `OsError::InvalidSocket` if a socket that corresponds
-/// to the provided descriptor is not found.
+/// # エラー
+/// 指定されたディスクリプタに対応するソケットが見つからなかった場合、
+/// この関数は `OsError::InvalidSocket` を返す。
 pub fn sys_sock_status(sock_idx: usize, tf: &mut TrapFrame) {
     // Lab 5 2.D
-    unimplemented!("sys_sock_status")
+    SCHEDULER.critical(|scheduler| {
+        let process = scheduler.find_process(tf);
+        if process.sockets.len() <= sock_idx {
+            tf.xn[7] = OsError::InvalidSocket as u64;
+            return;
+        }
+        let handle = process.sockets[sock_idx];
+        ETHERNET.critical(|driver| {
+            let socket = driver.get_socket(handle);
+            tf.xn[0] = socket.is_active() as u64;
+            tf.xn[1] = socket.is_listening() as u64;
+            tf.xn[2] = socket.can_send() as u64;
+            tf.xn[3] = socket.can_recv() as u64;
+            tf.xn[7] = OsError::Ok as u64;
+        });
+    });
 }
 
-/// Connects a local ephemeral port to a remote IP endpoint with a socket.
+/// ソケットを使ってローカルエフェメラルポートをリモートIPエンドポイントに
+/// 接続する。
 ///
-/// This system call takes a socket descriptor as the first parameter, the IP
-/// of the remote endpoint as the second paramter in big endian, and the port
-/// number of the remote endpoint as the third parameter.
+/// このシステムコールは第1パラメタとしてソケットディスクリプタ、
+/// 第2パラメタとしてビッグエンディアンのリモートのIPエンドポイント、
+/// 第3パラメタとしてリモートエンドポイントのポート番号を取る。
 ///
-/// `handle_syscall` should read the value of registers and create a struct that
-/// implements `Into<IpEndpoint>` when calling this function.
+/// `handle_syscall` はこの関数を呼び出す際にレジスタの値を読み込んで、
+/// `Into<IpEndpoint>` を実装する構造体を作成する必要がある。
 ///
-/// It only returns the usual status value.
+/// この関数は通常のステータス値だけを返す。
 ///
-/// # Errors
-/// This function can return following errors:
+/// # エラー
+/// この関数は次のエラーを返すことができる:
 ///
-/// - `OsError::NoEntry`: Fails to allocate an ephemeral port
-/// - `OsError::InvalidSocket`: Cannot find a socket that corresponds to the provided descriptor.
-/// - `OsError::IllegalSocketOperation`: `connect()` returned `smoltcp::Error::Illegal`.
-/// - `OsError::BadAddress`: `connect()` returned `smoltcp::Error::Unaddressable`.
-/// - `OsError::Unknown`: All the other errors from calling `connect()`.
+/// - `OsError::NoEntry`: エフェメラルポートを割り当てられなかった
+/// - `OsError::InvalidSocket`: 指定のディスクリプタに対応するソケットが見つからなかった
+/// - `OsError::IllegalSocketOperation`: `connect()`が `smoltcp::Error::Illegal` を返した
+/// - `OsError::BadAddress`: `connect()` が `smoltcp::Error::Unaddressable` を返した
+/// - `OsError::Unknown`: `connect()`の呼び出しによるその他のすべてのエラー
 pub fn sys_sock_connect(
     sock_idx: usize,
     remote_endpoint: impl Into<IpEndpoint>,
     tf: &mut TrapFrame,
 ) {
     // Lab 5 2.D
-    unimplemented!("sys_sock_connect")
+    SCHEDULER.critical(|scheduler| {
+        let process = scheduler.find_process(tf);
+        if process.sockets.len() <= sock_idx {
+            tf.xn[7] = OsError::InvalidSocket as u64;
+            return;
+        }
+        let handle = process.sockets[sock_idx];
+
+        let port = ETHERNET.critical(|driver| driver.get_ephemeral_port());
+        if port.is_none() {
+            tf.xn[7] = OsError::NoEntry as u64;
+            return;
+        }
+        let port = port.unwrap();
+        let ipaddr = ETHERNET.critical(|driver| driver.get_ipaddress());
+        let local_endpoint = IpEndpoint::new(ipaddr, port);
+
+        ETHERNET.critical(|driver| {
+            let mut socket = driver.get_socket(handle);
+            match socket.connect(remote_endpoint, local_endpoint) {
+                Ok(_) => {
+                    ETHERNET.critical(|driver| driver.mark_port(port));
+                    tf.xn[7] = OsError::Ok as u64;
+                }
+                Err(smoltcp::Error::Illegal) => tf.xn[7] = OsError::IllegalSocketOperation as u64,
+                Err(smoltcp::Error::Unaddressable) => tf.xn[7] = OsError::BadAddress as u64,
+                Err(_) => tf.xn[7] = OsError::Unknown as u64,
+            }
+        });
+    });
 }
 
-/// Listens on a local port for an inbound connection.
+/// ローカルポートで着信接続をリッスンする。
 ///
-/// This system call takes a socket descriptor as the first parameter and the
-/// local ports to listen on as the second parameter.
+/// このシステムコールは第1パラメタとしてソケットディスクリプタ、
+/// 第2パラメタとしてリッスンするローカルポートを取る。
 ///
-/// It only returns the usual status value.
+/// この関数は通常のステータス値だけを返す。
 ///
-/// # Errors
-/// This function can return following errors:
+/// # エラー
+/// この関数は次のエラーを返すことができる:
 ///
-/// - `OsError::InvalidSocket`: Cannot find a socket that corresponds to the provided descriptor.
-/// - `OsError::IllegalSocketOperation`: `listen()` returned `smoltcp::Error::Illegal`.
-/// - `OsError::BadAddress`: `listen()` returned `smoltcp::Error::Unaddressable`.
-/// - `OsError::Unknown`: All the other errors from calling `listen()`.
+/// - `OsError::InvalidSocket`: 指定のディスクリプタに対応するソケットが見つからなかった
+/// - `OsError::IllegalSocketOperation`: `listen()` が `smoltcp::Error::Illegal` を返した
+/// - `OsError::BadAddress`: `listen()` が `smoltcp::Error::Unaddressable` を返した
+/// - `OsError::Unknown`: `listen()`の呼び出しによるその他のすべてのエラー
 pub fn sys_sock_listen(sock_idx: usize, local_port: u16, tf: &mut TrapFrame) {
     // Lab 5 2.D
-    unimplemented!("sys_sock_listen")
+    SCHEDULER.critical(|scheduler| {
+        let process = scheduler.find_process(tf);
+        if process.sockets.len() <= sock_idx {
+            tf.xn[7] = OsError::InvalidSocket as u64;
+            return;
+        }
+        let handle = process.sockets[sock_idx];
+        let ipaddr = ETHERNET.critical(|driver| driver.get_ipaddress());
+        let local_endpoint = IpEndpoint::new(ipaddr, local_port);
+        ETHERNET.critical(|driver| {
+            let mut socket = driver.get_socket(handle);
+            match socket.listen(local_endpoint) {
+                Ok(_) => tf.xn[7] = OsError::Ok as u64,
+                Err(smoltcp::Error::Illegal) => tf.xn[7] = OsError::IllegalSocketOperation as u64,
+                Err(smoltcp::Error::Unaddressable) => tf.xn[7] = OsError::BadAddress as u64,
+                Err(_) => tf.xn[7] = OsError::Unknown as u64,
+            }
+        });
+    });
 }
 
 /// 仮想アドレスと長さからスライスを返す.
@@ -184,46 +267,90 @@ unsafe fn to_user_slice_mut<'a>(va: usize, len: usize) -> OsResult<&'a mut [u8]>
     }
 }
 
-/// Sends data with a connected socket.
+/// 接続されたソケットを使ってデータを送信する.
 ///
-/// This system call takes a socket descriptor as the first parameter, the
-/// address of the buffer as the second parameter, and the length of the buffer
-/// as the third parameter.
+/// このシステムコールは第1パラメタとしてソケットディスクリプタ、
+/// 第2パラメタとしてバッファアドレス、
+/// 第3パラメタとしてバッファ長を取る。
 ///
-/// In addition to the usual status value, this system call returns one
-/// parameter: the number of bytes sent.
+/// この関数は通常のステータス値に加え、送信したバイト長を返す。
 ///
-/// # Errors
-/// This function can return following errors:
+/// # エラー
+/// この関数は次のエラーを返すことができる:
 ///
-/// - `OsError::InvalidSocket`: Cannot find a socket that corresponds to the provided descriptor.
-/// - `OsError::BadAddress`: The address and the length pair does not form a valid userspace slice.
-/// - `OsError::IllegalSocketOperation`: `send_slice()` returned `smoltcp::Error::Illegal`.
-/// - `OsError::Unknown`: All the other errors from smoltcp.
+/// - `OsError::InvalidSocket`: 指定のディスクリプタに対応するソケットが見つからなかった
+/// - `OsError::BadAddress`: アドレスと長さのペアが有効なユーザアドレス空間のスライスとならない
+/// - `OsError::IllegalSocketOperation`: `send_slice()` が `smoltcp::Error::Illegal` を返した。
+/// - `OsError::Unknown`: smoltcpからのその他のすべてのエラー
 pub fn sys_sock_send(sock_idx: usize, va: usize, len: usize, tf: &mut TrapFrame) {
     // Lab 5 2.D
-    unimplemented!("sys_sock_send")
+    SCHEDULER.critical(|scheduler| {
+        let process = scheduler.find_process(tf);
+        if process.sockets.len() <= sock_idx {
+            tf.xn[7] = OsError::InvalidSocket as u64;
+            return;
+        }
+        let handle = process.sockets[sock_idx];
+        ETHERNET.critical(|driver| {
+            let mut socket = driver.get_socket(handle);
+            match unsafe { to_user_slice(va, len) } {
+                Ok(data) => {
+                    match socket.send_slice(data) {
+                        Ok(size) => {
+                            tf.xn[1] = size as u64;
+                            tf.xn[7] = OsError::Ok as u64;
+                        }
+                        Err(smoltcp::Error::Illegal) => tf.xn[7] = OsError::IllegalSocketOperation as u64,
+                        Err(_) => tf.xn[7] = OsError::Unknown as u64,
+                    }
+                }
+                Err(error) => tf.xn[7] = error as u64,
+            };
+        });
+    });
 }
 
-/// Receives data from a connected socket.
+/// 接続されたソケットからデータを受診する.
 ///
-/// This system call takes a socket descriptor as the first parameter, the
-/// address of the buffer as the second parameter, and the length of the buffer
-/// as the third parameter.
+/// このシステムコールは第1パラメタとしてソケットディスクリプタ、
+/// 第2パラメタとしてバッファアドレス、
+/// 第3パラメタとしてバッファ長を取る。
 ///
-/// In addition to the usual status value, this system call returns one
-/// parameter: the number of bytes read.
+/// この関数は通常のステータス値に加え、受診したバイト長を返す。
 ///
-/// # Errors
-/// This function can return following errors:
+/// # エラー
+/// この関数は次のエラーを返すことができる:
 ///
-/// - `OsError::InvalidSocket`: Cannot find a socket that corresponds to the provided descriptor.
-/// - `OsError::BadAddress`: The address and the length pair does not form a valid userspace slice.
-/// - `OsError::IllegalSocketOperation`: `recv_slice()` returned `smoltcp::Error::Illegal`.
-/// - `OsError::Unknown`: All the other errors from smoltcp.
+/// - `OsError::InvalidSocket`: 指定のディスクリプタに対応するソケットが見つからなかった
+/// - `OsError::BadAddress`: アドレスと長さのペアが有効なユーザアドレス空間のスライスとならない
+/// - `OsError::IllegalSocketOperation`: `recv_slice()` が `smoltcp::Error::Illegal` を返した。
+/// - `OsError::Unknown`: smoltcpからのその他のすべてのエラー
 pub fn sys_sock_recv(sock_idx: usize, va: usize, len: usize, tf: &mut TrapFrame) {
     // Lab 5 2.D
-    unimplemented!("sys_sock_recv")
+    SCHEDULER.critical(|scheduler| {
+        let process = scheduler.find_process(tf);
+        if process.sockets.len() <= sock_idx {
+            tf.xn[7] = OsError::InvalidSocket as u64;
+            return;
+        }
+        let handle = process.sockets[sock_idx];
+        ETHERNET.critical(|driver| {
+            let mut socket = driver.get_socket(handle);
+            match unsafe { to_user_slice_mut(va, len) } {
+                Ok(data) => {
+                    match socket.recv_slice(data) {
+                        Ok(size) => {
+                            tf.xn[1] = size as u64;
+                            tf.xn[7] = OsError::Ok as u64;
+                        }
+                        Err(smoltcp::Error::Illegal) => tf.xn[7] = OsError::IllegalSocketOperation as u64,
+                        Err(_) => tf.xn[7] = OsError::Unknown as u64,
+                    }
+                }
+                Err(error) => tf.xn[7] = error as u64,
+            };
+        });
+    });
 }
 
 /// UTF-8文字列をコンソールに出力する.
@@ -267,6 +394,21 @@ pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
         NR_WRITE => sys_write(tf.xn[0] as u8, tf),
         NR_GETPID => sys_getpid(tf),
         NR_WRITE_STR => sys_write_str(tf.xn[0] as usize, tf.xn[1] as usize, tf),
+        NR_SOCK_CREATE => sys_sock_create(tf),
+        NR_SOCK_STATUS => sys_sock_status(tf.xn[0] as usize, tf),
+        NR_SOCK_CONNECT => {
+            let ipaddr_be = tf.xn[1];
+            let a0 = ((ipaddr_be & 0xff000000_00000000) >> 56) as u8;
+            let a1 = ((ipaddr_be & 0x00ff0000_00000000) >> 48) as u8;
+            let a2 = ((ipaddr_be & 0x0000ff00_00000000) >> 40) as u8;
+            let a3 = ((ipaddr_be & 0x000000ff_00000000) >> 32) as u8;
+            let ipaddr = IpAddress::v4(a0, a1, a2, a3);
+            let port = tf.xn[2] as u16;
+            sys_sock_connect(tf.xn[0] as usize, IpEndpoint::new(ipaddr, port), tf);
+        }
+        NR_SOCK_LISTEN => sys_sock_listen(tf.xn[0] as usize, tf.xn[1] as u16, tf),
+        NR_SOCK_SEND => sys_sock_send(tf.xn[0] as usize, tf.xn[1] as usize, tf.xn[2] as usize, tf),
+        NR_SOCK_RECV => sys_sock_recv(tf.xn[0] as usize, tf.xn[1] as usize, tf.xn[2] as usize, tf),
         _ => unimplemented!("syscall {}", num),
     }
 }
