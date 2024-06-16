@@ -186,10 +186,12 @@ impl GlobalScheduler {
         let scheduler = Scheduler::new();
         *self.0.lock() = Some(scheduler);
 
-        for _ in 0..4 {
+        for _ in 0..3 {
             let p = Process::load("/fib").expect("load /fib");
             self.add(p);
         }
+        let p = Process::load("/echo").expect("load /echo");
+        self.add(p);
     }
 
     // 次のメソッドはフェーズ3のテストに役に立つだろう。
