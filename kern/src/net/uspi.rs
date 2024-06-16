@@ -201,27 +201,24 @@ pub fn usDelay(nMicroSeconds: u32) {
 #[no_mangle]
 pub unsafe fn ConnectInterrupt(nIRQ: u32, pHandler: TInterruptHandler, pParam: *mut c_void) {
     // Lab 5 2.B
-    unimplemented!("FIXME later");
-/*
-    assert!(nIRQ != Interrupt::Timer3 as u32 && nIRQ != Interrupt::Usb as u32, "invalide nRIQ");
+    assert!(nIRQ != Interrupt::Timer3 as u32 && nIRQ != Interrupt::Usb as u32, "invalide nIRQ");
     assert!(pHandler.is_some(), "pHandler is None");
 
     let handler = pHandler.unwrap();
-
+    let param = pParam as u64;
     match Interrupt::from(nIRQ as usize) {
         Interrupt::Usb => {
             let mut controller = Controller::new();
             controller.enable_fiq(Interrupt::Usb);
-            FIQ.register((), Box::new(|tf| { handler(pParam) }));
+            FIQ.register((), Box::new(move |tf| { handler(param as *mut c_void) }));
         }
         Interrupt::Timer3 => {
             let mut controller = Controller::new();
             controller.enable(Interrupt::Timer3);
-            GLOBAL_IRQ.register(Interrupt::Timer3, Box::new(|tf| { handler(pParam) }));
+            GLOBAL_IRQ.register(Interrupt::Timer3, Box::new(move |tf| { handler(param as *mut c_void) }));
         }
         _ => {}
     }
-*/
 }
 
 /// `uspi_trace!`マクロを使ってUSPiからのログメッセージを書き出す.
