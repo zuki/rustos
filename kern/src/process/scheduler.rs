@@ -84,6 +84,7 @@ impl GlobalScheduler {
         loop {
             let rtn = self.critical(|scheduler| scheduler.switch_to(tf));
             if let Some(id) = rtn {
+            /*
                 trace!(
                     "[core-{}] switch_to {:?}, pc: {:x}, lr: {:x}, x29: {:x}, x28: {:x}, x27: {:x}",
                     affinity(),
@@ -94,6 +95,7 @@ impl GlobalScheduler {
                     tf.xn[28],
                     tf.xn[27]
                 );
+            */
                 return id;
             }
             aarch64::wfi();
@@ -186,12 +188,22 @@ impl GlobalScheduler {
         let scheduler = Scheduler::new();
         *self.0.lock() = Some(scheduler);
 
+    /*
         for _ in 0..3 {
             let p = Process::load("/fib").expect("load /fib");
             self.add(p);
         }
+    */
         let p = Process::load("/echo").expect("load /echo");
         self.add(p);
+    /*
+        let p = Process::load("/fib_20").expect("load /fib_20");
+        self.add(p);
+        let p = Process::load("/fib_25").expect("load /fib_25");
+        self.add(p);
+        let p = Process::load("/fib_30").expect("load /fib_30");
+        self.add(p);
+    */
     }
 
     // 次のメソッドはフェーズ3のテストに役に立つだろう。
@@ -259,7 +271,7 @@ impl Scheduler {
         };
         self.last_id = Some(id);
         process.context.tpidr = id;
-        trace!("pid {} added to core {}", id, affinity());
+        //trace!("pid {} added to core {}", id, affinity());
         self.processes.push_back(process);
         Some(id)
     }
@@ -301,7 +313,7 @@ impl Scheduler {
         }
         // 切り替えるプロセスがない
         if index == self.processes.len() {
-            trace!("[{}] no process", affinity());
+            //trace!("[{}] no process", affinity());
             return None;
         }
         //trace!("sw_to_before.tf\n{:?}", &tf);
@@ -324,7 +336,7 @@ impl Scheduler {
                 let mut process = self.processes.remove(index).unwrap();
                 self.release_process_resources(tf);
                 process.state = State::Dead;
-                trace!("[{}]: kill pid={}", affinity(), process.context.tpidr);
+                //trace!("[{}]: kill pid={}", affinity(), process.context.tpidr);
                 Some(process.context.tpidr)
             }
             None => None,

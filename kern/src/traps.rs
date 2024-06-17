@@ -15,7 +15,7 @@ use self::syndrome::Syndrome;
 use self::syscall::handle_syscall;
 use crate::percore;
 use crate::traps::irq::IrqHandlerRegistry;
-use crate::GLOBAL_IRQ;
+use crate::{GLOBAL_IRQ, FIQ};
 
 #[repr(u16)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -71,7 +71,7 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame, far
             let controller = Controller::new();
             for int in Interrupt::iter() {
                 if controller.is_pending(int) {
-                    //kprintln!("IRQ: {:?}", *int as u32);
+                    //info!("IRQ: {:?} fire", int as u32);
                     GLOBAL_IRQ.invoke(int, tf);
                 }
             }
@@ -81,12 +81,14 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame, far
             let controller = LocalController::new(core);
             for int in LocalInterrupt::iter() {
                 if controller.is_pending(int) {
+                    //info!("Local IRQ: {:?} fire", int as u32);
                     percore::local_irq().invoke(int, tf);
                 }
             }
         }
         Kind::Fiq => {
-            GLOBAL_IRQ.invoke(Interrupt::Usb, tf);
+            //info!("FIQ fire");
+            FIQ.invoke((), tf);
         }
         _ => {
             //

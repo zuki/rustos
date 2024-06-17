@@ -17,7 +17,7 @@ use crate::net::Frame;
 use crate::traps::irq::IrqHandlerRegistry;
 use crate::{ALLOCATOR, GLOBAL_IRQ, FIQ};
 
-const DEBUG_USPI: bool = false;
+const DEBUG_USPI: bool = true;
 pub macro uspi_trace {
     () => (if DEBUG_USPI { trace!("\n") } ),
     ($fmt:expr) => (if DEBUG_USPI { trace!(concat!($fmt, "\n")) }),
@@ -201,12 +201,13 @@ pub fn usDelay(nMicroSeconds: u32) {
 #[no_mangle]
 pub unsafe fn ConnectInterrupt(nIRQ: u32, pHandler: TInterruptHandler, pParam: *mut c_void) {
     // Lab 5 2.B
-    assert!(nIRQ != Interrupt::Timer3 as u32 && nIRQ != Interrupt::Usb as u32, "invalide nIRQ");
+    let irq = Interrupt::from(nIRQ as usize);
+    assert!(irq == Interrupt::Timer3 || irq == Interrupt::Usb, "invalide nIRQ: {}", nIRQ);
     assert!(pHandler.is_some(), "pHandler is None");
 
     let handler = pHandler.unwrap();
     let param = pParam as u64;
-    match Interrupt::from(nIRQ as usize) {
+    match irq {
         Interrupt::Usb => {
             let mut controller = Controller::new();
             controller.enable_fiq(Interrupt::Usb);
@@ -225,11 +226,12 @@ pub unsafe fn ConnectInterrupt(nIRQ: u32, pHandler: TInterruptHandler, pParam: *
 #[no_mangle]
 pub unsafe fn DoLogWrite(_pSource: *const u8, _Severity: u32, pMessage: *const u8) {
     // Lab 5 2.B
-    let msg_str: &[u8] = from_ref(&*pMessage);
-    let message: &str = match from_utf8(msg_str) {
-        Ok(s) => s,
-        Err(_) => "convert error",
-    };
+    let mut size: usize = 0;
+    while unsafe { *(pMessage.add(size)) } != b'\0' {
+        size += 1;
+    }
+    let buf = unsafe { core::slice::from_raw_parts(pMessage, size) };
+    let message = unsafe { core::str::from_utf8_unchecked(buf) };
     uspi_trace!("{}", message);
 
 }

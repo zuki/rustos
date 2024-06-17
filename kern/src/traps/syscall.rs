@@ -384,9 +384,11 @@ pub fn sys_write_str(va: usize, len: usize, tf: &mut TrapFrame) {
 
 // システムコールを処理する
 pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
-    //use crate::console::kprintln;
-    //kprintln!("handle_syscall: {}", num);
-    //kprintln!("x0: {:X}", tf.xn[0]);
+/*
+    if num == NR_SOCK_SEND as u16 {
+        info!("SEND: x0: {}, 0x{:x}, {}", tf.xn[0], tf.xn[1], tf.xn[2]);
+    }
+*/
     match num as usize {
         NR_SLEEP => sys_sleep(tf.xn[0] as u32, tf),
         NR_TIME => sys_time(tf),

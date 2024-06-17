@@ -19,23 +19,21 @@ fn main() {
 
 fn main_inner() -> OsResult<!> {
     // Lab 5 3
+    let mut buf = [0_u8; 512];
+
     let descriptor = sock_create();
     sock_listen(descriptor, 80_u16);
-    print!("connect ");
     loop {
         let status = sock_status(descriptor)?;
         if status.can_send {
-            println!(" ok.");
-            break;
+            let mes = "Welcome to RPi echo server!";
+            sock_send(descriptor, mes.as_bytes());
         } else {
-            print!(".");
+            println!("Waiting client connection...");
             sleep(Duration::from_secs(1));
         }
     }
-    let welcome: &str = "welcome echo server!\n";
-    sock_send(descriptor, welcome.as_bytes());
 
-    let mut buf = [0_u8; 512];
     loop {
         let size = sock_recv(descriptor, &mut buf)?;
         println!("{:?}", &buf[..size]);
