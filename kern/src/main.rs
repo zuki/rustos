@@ -80,7 +80,6 @@ unsafe fn kmain() -> ! {
     while !USB.is_eth_link_up() {}
     disable_fiq_interrupt();
 
-    //debug!("1");
     init::initialize_app_cores();
     VMM.wait();
     SCHEDULER.start();

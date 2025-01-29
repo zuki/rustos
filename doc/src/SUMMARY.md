@@ -16,6 +16,7 @@
 
 - [X-Modemフィル転送プロトコルを理解する](xmodem.md)
 - [FAT構造体](lab/fat-structs.md)
+- [smoltcp](smoltcp_0_6_0.md)
 
 ## 作業メモ
 

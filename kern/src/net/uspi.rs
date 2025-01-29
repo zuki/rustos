@@ -192,7 +192,7 @@ pub fn usDelay(nMicroSeconds: u32) {
 }
 
 /// `pHandler`をカーネルのIRQハンドラレジストリに登録する.
-/// 次回カーネルが`nIRQ`シグナルを受診した際、ハンドラ関数
+/// 次回カーネルが`nIRQ`シグナルを受信した際、ハンドラ関数
 /// `pHandler`が`pPrama`で実行される。
 ///
 /// `nIRQ == Interrupt::Usb`の場合はFIQ割り込みハンドラレジスタに
@@ -222,17 +222,22 @@ pub unsafe fn ConnectInterrupt(nIRQ: u32, pHandler: TInterruptHandler, pParam: *
     }
 }
 
-/// `uspi_trace!`マクロを使ってUSPiからのログメッセージを書き出す.
-#[no_mangle]
-pub unsafe fn DoLogWrite(_pSource: *const u8, _Severity: u32, pMessage: *const u8) {
-    // Lab 5 2.B
+unsafe fn ptr_to_str(ptr: *const u8, default: &'static str) -> &'static str {
     let mut size: usize = 0;
-    while unsafe { *(pMessage.add(size)) } != b'\0' {
+    while { *(ptr.add(size)) } != b'\0' {
         size += 1;
     }
-    let buf = unsafe { core::slice::from_raw_parts(pMessage, size) };
-    let message = unsafe { core::str::from_utf8_unchecked(buf) };
-    uspi_trace!("{}", message);
+    let buf = core::slice::from_raw_parts(ptr, size);
+    core::str::from_utf8(buf).unwrap_or(default)
+}
+
+/// `uspi_trace!`マクロを使ってUSPiからのログメッセージを書き出す.
+#[no_mangle]
+pub unsafe fn DoLogWrite(pSource: *const u8, _Severity: u32, pMessage: *const u8) {
+    // Lab 5 2.B
+    let source = ptr_to_str(pSource, "unknown source");
+    let message = ptr_to_str(pMessage, "invalid message");
+    uspi_trace!("{}: {}", source, message);
 
 }
 
@@ -244,16 +249,8 @@ pub fn DebugHexdump(_pBuffer: *const c_void, _nBufLen: u32, _pSource: *const u8)
 #[no_mangle]
 pub unsafe fn uspi_assertion_failed(pExpr: *const u8, pFile: *const u8, nLine: u32) {
     // Lab 5 2.B
-    let expr_str: &[u8] = from_ref(&*pExpr);
-    let expression: &str = match from_utf8(expr_str) {
-        Ok(s) => s,
-        Err(_) => "expression",
-    };
-    let file_str: &[u8] = from_ref(&*pFile);
-    let file: &str = match from_utf8(file_str) {
-        Ok(s) => s,
-        Err(_) => "Unknown file",
-    };
+    let expression = ptr_to_str(pExpr, "invalid expression");
+    let file = ptr_to_str(pFile, "invalid file name");
     uspi_trace!("{} [{}]: assert failed: {}", file, nLine, expression);
 }
 

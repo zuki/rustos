@@ -88,7 +88,7 @@ pub fn sys_getpid(tf: &mut TrapFrame) {
 /// このシステムコールは通常のステータス値に加えてソケットディスクリプタを
 /// 返す。
 ///
-/// NOTE: オリジナル注記には「今関数は通常のステータス値以外は何も
+/// NOTE: オリジナル注記には「この関数は通常のステータス値以外は何も
 /// 返さない」とあるがソケットディスクリプタを返さないと以後この
 /// ソケットは使えないはずなのでソケットディスクリプタを返す仕様にした
 ///
@@ -100,6 +100,7 @@ pub fn sys_getpid(tf: &mut TrapFrame) {
 /// 実装しなくても良いとあるので実装しなければ問題ないか?
 pub fn sys_sock_create(tf: &mut TrapFrame) {
     // Lab 5 2.D
+    trace!("sys_sock_create called");
     SCHEDULER.critical(|scheduler| {
         let process = scheduler.find_process(tf);
         let handle = ETHERNET.add_socket();
@@ -171,6 +172,7 @@ pub fn sys_sock_connect(
     tf: &mut TrapFrame,
 ) {
     // Lab 5 2.D
+    trace!("sys_sock_connect called with: idx {}", sock_idx);
     SCHEDULER.critical(|scheduler| {
         let process = scheduler.find_process(tf);
         if process.sockets.len() <= sock_idx {
@@ -179,18 +181,17 @@ pub fn sys_sock_connect(
         }
         let handle = process.sockets[sock_idx];
 
-        let port = ETHERNET.critical(|driver| driver.get_ephemeral_port());
-        if port.is_none() {
+        let port: u16;
+        if let Some(eport) = ETHERNET.critical(|driver| driver.get_ephemeral_port()) {
+            port = eport;
+        } else {
             tf.xn[7] = OsError::NoEntry as u64;
             return;
         }
-        let port = port.unwrap();
-        let ipaddr = ETHERNET.critical(|driver| driver.get_ipaddress());
-        let local_endpoint = IpEndpoint::new(ipaddr, port);
 
         ETHERNET.critical(|driver| {
             let mut socket = driver.get_socket(handle);
-            match socket.connect(remote_endpoint, local_endpoint) {
+            match socket.connect(remote_endpoint, port) {
                 Ok(_) => {
                     ETHERNET.critical(|driver| driver.mark_port(port));
                     tf.xn[7] = OsError::Ok as u64;
@@ -218,6 +219,7 @@ pub fn sys_sock_connect(
 /// - `OsError::BadAddress`: `listen()` が `smoltcp::Error::Unaddressable` を返した
 /// - `OsError::Unknown`: `listen()`の呼び出しによるその他のすべてのエラー
 pub fn sys_sock_listen(sock_idx: usize, local_port: u16, tf: &mut TrapFrame) {
+    trace!("sys_sock_listen called with idx {}, port {}", sock_idx, local_port);
     // Lab 5 2.D
     SCHEDULER.critical(|scheduler| {
         let process = scheduler.find_process(tf);
@@ -226,11 +228,11 @@ pub fn sys_sock_listen(sock_idx: usize, local_port: u16, tf: &mut TrapFrame) {
             return;
         }
         let handle = process.sockets[sock_idx];
-        let ipaddr = ETHERNET.critical(|driver| driver.get_ipaddress());
-        let local_endpoint = IpEndpoint::new(ipaddr, local_port);
+        //let ipaddr = ETHERNET.critical(|driver| driver.get_ipaddress());
+        //let local_endpoint = IpEndpoint::new(ipaddr, local_port);
         ETHERNET.critical(|driver| {
             let mut socket = driver.get_socket(handle);
-            match socket.listen(local_endpoint) {
+            match socket.listen(local_port) {
                 Ok(_) => tf.xn[7] = OsError::Ok as u64,
                 Err(smoltcp::Error::Illegal) => tf.xn[7] = OsError::IllegalSocketOperation as u64,
                 Err(smoltcp::Error::Unaddressable) => tf.xn[7] = OsError::BadAddress as u64,
@@ -284,12 +286,14 @@ unsafe fn to_user_slice_mut<'a>(va: usize, len: usize) -> OsResult<&'a mut [u8]>
 /// - `OsError::Unknown`: smoltcpからのその他のすべてのエラー
 pub fn sys_sock_send(sock_idx: usize, va: usize, len: usize, tf: &mut TrapFrame) {
     // Lab 5 2.D
+    trace!("sys_sock_send called with idx {}", sock_idx);
     SCHEDULER.critical(|scheduler| {
         let process = scheduler.find_process(tf);
         if process.sockets.len() <= sock_idx {
             tf.xn[7] = OsError::InvalidSocket as u64;
             return;
         }
+
         let handle = process.sockets[sock_idx];
         ETHERNET.critical(|driver| {
             let mut socket = driver.get_socket(handle);
@@ -310,13 +314,13 @@ pub fn sys_sock_send(sock_idx: usize, va: usize, len: usize, tf: &mut TrapFrame)
     });
 }
 
-/// 接続されたソケットからデータを受診する.
+/// 接続されたソケットからデータを受信する.
 ///
 /// このシステムコールは第1パラメタとしてソケットディスクリプタ、
 /// 第2パラメタとしてバッファアドレス、
 /// 第3パラメタとしてバッファ長を取る。
 ///
-/// この関数は通常のステータス値に加え、受診したバイト長を返す。
+/// この関数は通常のステータス値に加え、受信したバイト長を返す。
 ///
 /// # エラー
 /// この関数は次のエラーを返すことができる:
@@ -327,6 +331,7 @@ pub fn sys_sock_send(sock_idx: usize, va: usize, len: usize, tf: &mut TrapFrame)
 /// - `OsError::Unknown`: smoltcpからのその他のすべてのエラー
 pub fn sys_sock_recv(sock_idx: usize, va: usize, len: usize, tf: &mut TrapFrame) {
     // Lab 5 2.D
+    trace!("sys_sock_recv called with idx {}", sock_idx);
     SCHEDULER.critical(|scheduler| {
         let process = scheduler.find_process(tf);
         if process.sockets.len() <= sock_idx {
@@ -399,13 +404,19 @@ pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
         NR_SOCK_CREATE => sys_sock_create(tf),
         NR_SOCK_STATUS => sys_sock_status(tf.xn[0] as usize, tf),
         NR_SOCK_CONNECT => {
+        /*
             let ipaddr_be = tf.xn[1];
             let a0 = ((ipaddr_be & 0xff000000_00000000) >> 56) as u8;
             let a1 = ((ipaddr_be & 0x00ff0000_00000000) >> 48) as u8;
             let a2 = ((ipaddr_be & 0x0000ff00_00000000) >> 40) as u8;
             let a3 = ((ipaddr_be & 0x000000ff_00000000) >> 32) as u8;
             let ipaddr = IpAddress::v4(a0, a1, a2, a3);
+        */
+            let bytes = (tf.xn[1] as u32).to_be_bytes();
+            let ipaddr = IpAddress::v4(bytes[0], bytes[1], bytes[2], bytes[3]);
             let port = tf.xn[2] as u16;
+            //trace!("connect from 0x{:x} ({}.{}.{}.{}): {}", ipaddr_be, a0, a1, a2, a3, port);
+            trace!("connect from 0x{:x} ({}.{}.{}.{}): {}", tf.xn[1], bytes[0], bytes[1], bytes[2], bytes[3], port);
             sys_sock_connect(tf.xn[0] as usize, IpEndpoint::new(ipaddr, port), tf);
         }
         NR_SOCK_LISTEN => sys_sock_listen(tf.xn[0] as usize, tf.xn[1] as u16, tf),

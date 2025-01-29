@@ -153,7 +153,7 @@ pub fn sock_status(descriptor: SocketDescriptor) -> OsResult<SocketStatus> {
              : "x0", "x1", "x2", "x3", "x7"
              : "volatile");
     }
-    err_or!(ecode, SocketStatus {is_active, is_listening, can_send, can_recv})
+    err_or!(ecode, SocketStatus { is_active, is_listening, can_send, can_recv} )
 }
 
 pub fn sock_connect(descriptor: SocketDescriptor, addr: IpAddr) -> OsResult<()> {

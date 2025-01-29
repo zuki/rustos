@@ -11,6 +11,8 @@ use core::time::Duration;
 
 use aarch64::*;
 use pi::local_interrupt::{LocalInterrupt, LocalController, local_tick_in};
+use pi::interrupt::{Controller, Interrupt};
+use pi::timer;
 use smoltcp::time::Instant;
 
 use crate::mutex::Mutex;
@@ -113,9 +115,6 @@ impl GlobalScheduler {
     /// 使ってユーザ空間のプロセスの実行を開始する。このメソッドは
     /// 通常の条件では復帰しない。
     pub fn start(&self) -> ! {
-        //self.initialize_global_timer_interrupt();
-
-
         if affinity() == 0 {
             self.initialize_global_timer_interrupt();
         }
@@ -159,9 +158,22 @@ impl GlobalScheduler {
     /// 1 秒後に `poll_ethernet` を起動するタイマーハンドラを
     /// `Usb::start_kernel_timer` に登録する.
     pub fn initialize_global_timer_interrupt(&self) {
-        if affinity() == 0 {
-            USB.start_kernel_timer(Duration::from_secs(1), Some(poll_ethernet));
-        }
+        // 1. グローバルタイマー割り込みの設定
+        let mut controller = Controller::new();
+        controller.enable(Interrupt::Timer1);
+
+        GLOBAL_IRQ.register(
+            Interrupt::Timer1,
+            Box::new(|tf| {
+                timer::tick_in(TICK);
+                SCHEDULER.switch(State::Ready, tf);
+            }),
+        );
+        timer::tick_in(TICK);
+
+
+        // 2. poll_ethernet起動タイマーハンドラの設定
+        USB.start_kernel_timer(Duration::from_secs(1), Some(poll_ethernet));
     }
 
     /// `pi::local_interrupt`を使ってper-coreローカルタイマーを初期化する.

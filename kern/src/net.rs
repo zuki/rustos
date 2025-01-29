@@ -181,8 +181,8 @@ impl EthernetDriver {
     fn poll(&mut self, timestamp: Instant) {
         // Lab 5 2.B
         match self.ethernet.poll(&mut self.socket_set, timestamp) {
-            Ok(_) => {}
-            Err(_) => {}
+            Ok(_) => { trace!("poll ok"); }
+            Err(e) => { trace!("poll error: {:?}", e); }
         }
     }
 
@@ -249,6 +249,7 @@ impl EthernetDriver {
         let rx_buffer = TcpSocketBuffer::new(vec![0; 16384]);
         let tx_buffer = TcpSocketBuffer::new(vec![0; 16384]);
         let tcp_socket = TcpSocket::new(rx_buffer, tx_buffer);
+        trace!("add tcp_socket");
         self.socket_set.add(tcp_socket)
     }
 
@@ -262,10 +263,12 @@ impl EthernetDriver {
         self.socket_set.prune();
     }
 
-    /// 内部ethernetインタフェースからIPアドレスを返す.
+/*
+    // 内部ethernetインタフェースからIPアドレスを返す.
     pub fn get_ipaddress(&mut self) -> IpAddress {
         IpAddress::from(self.ethernet.ipv4_addr().unwrap())
     }
+*/
 
 }
 
@@ -284,8 +287,9 @@ impl GlobalEthernetDriver {
 
     pub fn poll(&self, timestamp: Instant) {
         // Lab 5 2.B
-        // FIXME lator
-        if aarch64::affinity() == 0 && get_preemptive_counter() > 0 {
+        trace!("ETHERNET.poll called");
+        if aarch64::affinity() == 0 && get_preemptive_counter() == 0 {
+            info!("polled");
             self.0
             .lock()
             .as_mut()

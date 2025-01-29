@@ -3266,7 +3266,7 @@ pub unsafe fn ConnectInterrupt(nIRQ: u32, pHandler: TInterruptHandler, pParam: *
 }
 ```
 
-このように実装した場合、次のエラーになる。
+- このように実装した場合、次のエラーになる。
 
 ```bash
 error[E0277]: `*mut core::ffi::c_void` cannot be shared between threads safely
@@ -3284,6 +3284,37 @@ error[E0277]: `*mut core::ffi::c_void` cannot be shared between threads safely
     = note: required because of the requirements on the impl of `core::marker::Send` for `&*mut core::ffi::c_void`
     = note: required because it appears within the type `[closure@src/net/uspi.rs:208:53: 212:10 pHandler:&core::option::Option<unsafe extern "C" fn(*mut core::ffi::c_void)>, pParam:&*mut core::ffi::c_void]`
     = note: required for the cast to the object type `dyn for<'r> core::ops::FnMut(&'r mut traps::frame::TrapFrame) + core::marker::Send`
+```
+
+- 次の修正でエラーがなくなった
+   1. pParamはいったんu64に変換して、呼び出す際に`*mut c_void`に再変換
+   2. ハンドラ登録時のクロージャで`move`。これをしないと"does not live long enough"エラーが発生
+
+```rust
+pub unsafe fn ConnectInterrupt(nIRQ: u32, pHandler: TInterruptHandler, pParam: *mut c_void) {
+    // Lab 5 2.B
+    assert!(nIRQ != Interrupt::Timer3 as u32 && nIRQ != Interrupt::Usb as u32, "invalide nRIQ");
+    assert!(pHandler.is_some(), "pHandler is None");
+
+    let handler = pHandler.unwrap();
+    let param = pParam as u64;         // 一度、u64にする
+    match Interrupt::from(nIRQ as usize) {
+        Interrupt::Usb => {
+            let mut controller = Controller::new();
+            controller.enable_fiq(Interrupt::Usb);
+            // moveする。しないと "error[E0597]: `handler`/'param` does not live long enough"
+            FIQ.register((), Box::new(move |tf| { handler(param as *mut c_void) }));
+        }
+        Interrupt::Timer3 => {
+            let handler = pHandler.unwrap();
+            let param = pParam as u64;
+            let mut controller = Controller::new();
+            controller.enable(Interrupt::Timer3);
+            GLOBAL_IRQ.register(Interrupt::Timer3, Box::new(move |tf| { handler(param as *mut c_void) }));
+        }
+        _ => {}
+    }
+}
 ```
 
 # USPiのコンパイル
@@ -3340,4 +3371,397 @@ usbdevice.c:594:9: warning: implicit declaration of function ‘DoLogWrite’; d
   CC    usbstring.o
   CC    usbmidi.o
   AR    libuspi.a
+```
+
+# エコーサーバのテスト
+
+## エラー 1
+
+```bash
+---------- PANIC ----------
+
+FILE: src/net/uspi.rs
+LINE: 204
+COL: 5
+
+invalide nIRQ: 9
+```
+
+- `irq=9`はUSB制御割り込み
+- IrqではUSB割り込みは`2`
+- 生の割り込み番号からIrqの割り込み番号への変換に問題あり
+- そもそもどこで変換しているか?
+
+### これは`ConnectInterrupt()`内の`assert!()`のアサート内容が逆だった
+
+## エラー 2
+
+```bash
+---------- PANIC ----------
+
+FILE: src/traps/irq.rs
+LINE: 145
+COL: 21
+
+invoke invalid interrupt
+```
+
+### `handle_exception()`のバグだった
+
+## エラー 3
+
+```bash
+run kernel
+[INFO] text beg: 0000000000080000, end: 00000000000d3710
+[INFO] bss  beg: 00000000000d3420, end: 00000000000d3710
+connect .PID [1PID [PID [] fib(25) = 31213932] fib(25) =  (] fib(25) = 12139312)
+ms
+)
+ ok.
+Terminating with error: IllegalSocketOperation
+```
+
+## traceオン
+
+- `const DEBUG_USPI: bool = true` in `net/uspi.rs`
+- `VERBOSE_BUILD=1 make`
+
+```bash
+run kernel
+[INFO] text beg: 0000000000080000, end: 00000000000d3110
+[INFO] bss  beg: 00000000000d2e20, end: 00000000000d3110
+[TRACE] Initializing USPi library 2.00
+[TRACE] register
+[TRACE] set power state on
+[TRACE] disable all interrupt
+[TRACE] enable global interrupts
+[TRACE] enable root port
+[TRACE] _DWHCIRegister (&HostPort)
+[TRACE] rootport initialize
+[TRACE] port initializing
+[TRACE] register
+[TRACE] port speed
+[TRACE] Got Speed
+[TRACE] Created USBDevice
+[TRACE] @
+[TRACE] initializing
+[TRACE] devicegetdescriptor
+[TRACE] set max packetsize
+[TRACE] Device ven424-2514, dev9-0-2 found
+[TRACE] Interface int9-0-1 found
+[TRACE] Function is not supported
+[TRACE] Interface int9-0-2 found
+[TRACE] Using device/interface int9-0-2
+[TRACE] configuring
+[TRACE] initializing
+[TRACE] devicegetdescriptor
+[TRACE] set max packetsize
+[TRACE] Device ven424-2514, dev9-0-2 found
+[TRACE] Interface int9-0-1 found
+[TRACE] Function is not supported
+[TRACE] Interface int9-0-2 found
+[TRACE] Using device/interface int9-0-2
+[TRACE] initializing
+[TRACE] devicegetdescriptor
+[TRACE] set max packetsize
+[TRACE] Device ven424-7800 found
+[TRACE] Using device/interface ven424-7800
+[TRACE] MAC address is B8:27:EB:AB:E8:48
+[TRACE] Port 1: Device configured
+[TRACE] Port 1: Device configured
+[TRACE] Device configured
+[TRACE] register ahbconfig
+[TRACE] register vendorid
+[TRACE] done
+[TRACE] XXX. done init
+[TRACE] XXX. getdevice
+[TRACE] XXX. getdevice
+[TRACE] XXX. getdevice
+[TRACE] XXX. getdevice
+[TRACE] XXX. got ethernet
+[TRACE] USPi library successfully initialized
+[TRACE] Core 0, delay 1s, handler Some(0x87c38)
+[TRACE] [0]: adding
+[TRACE] #0:192.168.10.110:80: state=CLOSED=>LISTEN
+connect [TRACE] [1]: adding
+.[TRACE] [2]: adding
+ ok.
+send welcome message
+[INFO] SEND: x0: 0, 0xffffffffc0003dc0, 21
+Terminating with error: IllegalSocketOperation
+
+```
+
+## echoプログラムを修正
+
+```bash
+run kernel
+...
+[TRACE] USPi library successfully initialized
+
+[TRACE] Core 0, delay 1s, handler Some(0x87c38)
+[TRACE] [0]: adding
+[TRACE] #0:192.168.10.110:80: state=CLOSED=>LISTEN
+[TRACE] [1]: adding
+Waiting client connection...[TRACE] [2]: adding
+Waiting client connection...[TRACE] [3]: adding
+Waiting client connection...[TRACE] [4]: adding
+Waiting client connection...[TRACE] [5]: adding
+Waiting client connection...[TRACE] [6]: adding
+Waiting client connection...[TRACE] [7]: adding
+Waiting client connection...[TRACE] [8]: adding
+Waiting client connection...[TRACE] [9]: adding
+Waiting client connection...[TRACE] [10]: adding
+Waiting client connection...[TRACE] Core 1, delay 0ns, handler Some(0x87c38)
+[TRACE] [11]: adding
+...
+```
+
+## 6/17メモ
+
+- ネットワークドライバの実装でタイマー関数はpi::timer::spin_sleepを
+   使って実装するようになっているが、これはシステムタイマーで、lab4で
+   実装を削除したのではないか?
+- 実装(5)のヒントの「プリエンプティブカウンタをチェックする」意味は?
+- 6/18は実装(5)から
+
+## 6.18 現在
+
+- DoLogWrite()のsourceを出力するようにした
+
+```bash
+run kernel
+[INFO] text beg: 0000000000080000, end: 00000000000d3510
+[INFO] bss  beg: 00000000000d3220, end: 00000000000d3510
+[TRACE] uspi: Initializing USPi library 2.00
+[TRACE] dwhci: register
+[TRACE] dwhci: set power state on
+[TRACE] dwhci: disable all interrupt
+[TRACE] dwhci: enable global interrupts
+[TRACE] dwhci: enable root port
+[TRACE] dwhci: _DWHCIRegister (&HostPort)
+[TRACE] dwhci: rootport initialize
+[TRACE] dwroot: port initializing
+[TRACE] dwhci: register
+[TRACE] dwhci: port speed
+[TRACE] dwroot: Got Speed
+[TRACE] dwroot: Created USBDevice
+[TRACE] dwroot: @
+[TRACE] usbdev0-1: initializing
+[TRACE] usbdev0-1: devicegetdescriptor
+[TRACE] usbdev0-1: set max packetsize
+[TRACE] usbdev0-1: Device ven424-2514, dev9-0-2 found
+[TRACE] usbdev0-1: Interface int9-0-1 found
+[TRACE] usbdev0-1: Function is not supported
+[TRACE] usbdev0-1: Interface int9-0-2 found
+[TRACE] usbdev: Using device/interface int9-0-2
+[TRACE] dwroot: configuring
+[TRACE] usbdev0-1: initializing
+[TRACE] usbdev0-1: devicegetdescriptor
+[TRACE] usbdev0-1: set max packetsize
+[TRACE] usbdev0-1: Device ven424-2514, dev9-0-2 found
+[TRACE] usbdev0-1: Interface int9-0-1 found
+[TRACE] usbdev0-1: Function is not supported
+[TRACE] usbdev0-1: Interface int9-0-2 found
+[TRACE] usbdev: Using device/interface int9-0-2
+[TRACE] usbdev0-1: initializing
+[TRACE] usbdev0-1: devicegetdescriptor
+[TRACE] usbdev0-1: set max packetsize
+[TRACE] usbdev0-1: Device ven424-7800 found
+[TRACE] usbdev: Using device/interface ven424-7800
+[TRACE] lan7800: MAC address is B8:27:EB:AB:E8:48
+[TRACE] usbhub: Port 1: Device configured
+[TRACE] usbhub: Port 1: Device configured
+[TRACE] dwroot: Device configured
+[TRACE] dwhci: register ahbconfig
+[TRACE] dwhci: register vendorid
+[TRACE] dwhci: done
+[TRACE] uspi: XXX. done init
+[TRACE] uspi: XXX. getdevice
+[TRACE] uspi: XXX. getdevice
+
+[TRACE] uspi: XXX. getdevice
+
+[TRACE] uspi: XXX. getdevice
+[TRACE] uspi: XXX. got ethernet
+[TRACE] uspi: USPi library successfully initialized
+[TRACE] Core 0, delay 1s, handler Some(0x87ea0)
+[TRACE] [0]: adding                                   # src/socket/set.rs#SocketSet.add()で出力ｌハンドルインデックス
+socket 0 created
+[TRACE] #0:192.168.10.110:80: state=CLOSED=>LISTEN
+listen socket 0 port 80
+[TRACE] [1]: adding                                   # ここでもaddされている。processのハンドルindexと使用するソケットが違う?
+Terminating with error: IllegalSocketOperation        # socket.can_sendがfalse
+```
+
+## `sock_create()`について
+
+- サーバ側の処理関数は`pub fn sys_sock_create(tf: &mut TrapFrame)`
+- ライブラリのAPIは`pub fn sock_create() -> SocketDescriptor`
+
+オリジナル注記には「この関数は通常のステータス値以外は何も
+返さない」とあるがライブラリAPIはソケットディスクリプタを返すことに
+なっている。このディスプリプタは以後の操作で使用するので
+ソケットディスクリプタを返す仕様にした。では何を返すか。
+
+SocketHandleの定義は`struct SocketHandle(usize)`である。
+self.0をディスクリプタに使いたいがプライベートフィールドで
+アクセスできない。ここではprocess.socketsのindexをディスクリプタ
+として使うことにした。これは一度pushしたハンドルを削除されなければ
+問題ないが、削除されたら意味をなくしまう。close()システムコールは
+実装しなくても良いとあるので実装しなければ問題ないか?
+
+```bash
+[TRACE] uspi: USPi library successfully initialized
+
+[TRACE] Core 0, delay 1s, handler Some(0x870c0)
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [0]: adding
+socket 0 created
+[TRACE] sys_sock_listen called with idx 0, port 80
+[TRACE] #0:192.168.10.110:80: state=CLOSED=>LISTEN
+listen socket 0 port 80
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [1]: adding
+connected
+[TRACE] sys_sock_send called with idx 0
+[TRACE] sys_sock_create calle
+[TRACE] add tcp_socket
+[TRACE] [2]: adding
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [3]: adding
+[TRACE] sys_sock_create calle
+[TRACE] add tcp_socket
+[TRACE] [4]: adding
+```
+
+## 6/19
+
+```bash
+[TRACE] uspi: USPi library successfully initialized
+
+[TRACE] Core 0, delay 1s, handler Some(0x863d0)
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [0]: adding
+[ECHO] socket 0 created
+[TRACE] sys_sock_listen called with idx 0, port 80
+[TRACE] #0:*:80: state=CLOSED=>LISTEN
+[ECHO] listen socket 0 port 80
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [1]: adding
+[ECHO] sock_status 1
+connected
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [2]: adding
+[ECHO] sock_status 2
+[ECHO] sock_send 1
+[TRACE] sys_sock_send called with idx 0
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [3]: adding
+[ECHO] sock_status 3
+SocketStatus { is_active: true, is_listening: false, can_send: true, can_recv: false }
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [4]: adding
+[ECHO] sock_status 4
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [5]: adding
+[ECHO] sock_status 4
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [6]: adding
+[ECHO] sock_status 4
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [7]: adding
+[ECHO] sock_status 4
+```
+
+### `[ECHO] sock_`出力を呼び出し前に変えた
+
+```bash
+[TRACE] uspi: USPi library successfully initialized
+
+[TRACE] Core 0, delay 1s, handler Some(0x863d0)
+[ECHO] sock_create
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [0]: adding
+[ECHO] socket 0 created
+
+[ECHO] sock_listen
+[TRACE] sys_sock_listen called with idx 0, port 80
+[TRACE] #0:*:80: state=CLOSED=>LISTEN
+[ECHO] listen socket 0 port 80
+
+[ECHO] sock_status 0
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [1]: adding
+[ECHO] SocketStatus { is_active: true, is_listening: true, can_send: true, can_recv: false }
+
+[ECHO] sock_status 1
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [2]: adding
+Waiting client connection...
+```
+
+- sock_XXX を呼び出すごとにソケットが新たに作成される
+- sock_idxが意味をなしていない感じ
+
+### 今度はまた無限add_socket
+
+```bash
+[TRACE] uspi: USPi library successfully initialized
+
+[TRACE] Core 0, delay 1s, handler Some(0x863d0)
+[ECHO] sock_create
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [0]: adding
+[ECHO] socket 0 created
+[ECHO] sock_listen
+[TRACE] sys_sock_listen called with idx 0, port 80
+[TRACE] #0:*:80: state=CLOSED=>LISTEN
+[ECHO] listen socket 0 port 80
+[ECHO] sock_status 0
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [1]: adding
+[ECHO] 0 SocketStatus { is_active: true, is_listening: true, can_send: true, can_recv: false }
+[ECHO] sock_status 1
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [2]: adding
+[ECHO] 1 SocketStatus { is_active: false, is_listening: true, can_send: true, can_recv: false }
+connected
+[ECHO] sock_status 2
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [3]: adding
+[ECHO] 2 SocketStatus { is_active: true, is_listening: true, can_send: true, can_recv: false }
+[ECHO] sock_send 1
+[TRACE] sys_sock_send called with idx 0
+[ECHO] sock_status 3
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [4]: adding
+[ECHO] 3 SocketStatus { is_active: false, is_listening: true, can_send: true, can_recv: false }
+[ECHO] sock_status 4
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [5]: adding
+[ECHO] sock_status 4
+[TRACE] sys_sock_create called
+[TRACE] add tcp_socket
+[TRACE] [6]: adding
 ```

@@ -67,17 +67,20 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame, far
             }
         }
         Kind::Irq => {
-            enable_fiq_interrupt();
-            let controller = Controller::new();
-            for int in Interrupt::iter() {
-                if controller.is_pending(int) {
-                    //info!("IRQ: {:?} fire", int as u32);
-                    GLOBAL_IRQ.invoke(int, tf);
-                }
-            }
-            disable_fiq_interrupt();
-
             let core = affinity();
+
+            if core == 0 {
+                enable_fiq_interrupt();
+                let controller = Controller::new();
+                for int in Interrupt::iter() {
+                    if controller.is_pending(int) {
+                        //info!("IRQ: {:?} fire", int as u32);
+                        GLOBAL_IRQ.invoke(int, tf);
+                    }
+                }
+                disable_fiq_interrupt();
+            }
+
             let controller = LocalController::new(core);
             for int in LocalInterrupt::iter() {
                 if controller.is_pending(int) {
